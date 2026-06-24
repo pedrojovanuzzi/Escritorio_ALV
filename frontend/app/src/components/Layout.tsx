@@ -10,6 +10,7 @@ import {
   FiSearch,
   FiBell,
   FiLogOut,
+  FiUserCheck,
 } from "react-icons/fi";
 import logo from "../assets/logo.png";
 import { useAuth } from "../context/AuthContext";
@@ -29,6 +30,10 @@ const TITULOS: Record<string, { title: string; subtitle: string }> = {
     subtitle: "Gere notas e boletos para vários clientes de uma vez",
   },
   "/clientes": { title: "Clientes", subtitle: "Cadastros ativos" },
+  "/usuarios": {
+    title: "Usuários",
+    subtitle: "Gerencie os acessos ao sistema",
+  },
   "/historico": {
     title: "Histórico de documentos",
     subtitle: "Documentos emitidos",
@@ -47,6 +52,7 @@ const NAV = [
   ]},
   { secao: "Gerenciar", itens: [
     { to: "/clientes", label: "Clientes", icon: FiUsers },
+    { to: "/usuarios", label: "Usuários", icon: FiUserCheck },
     { to: "/historico", label: "Histórico", icon: FiClock },
     { to: "/documento", label: "Documentos", icon: FiEye },
   ]},

@@ -8,6 +8,15 @@ export interface UserData {
   token: string;
 }
 
+export interface Usuario {
+  id?: number;
+  nome: string;
+  email: string;
+  cargo?: string;
+  password?: string;
+  criado_em?: string;
+}
+
 export interface Cliente {
   id?: number;
   nome: string;

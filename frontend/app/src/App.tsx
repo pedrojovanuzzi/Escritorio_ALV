@@ -15,6 +15,7 @@ import { EmissaoLote } from "./pages/lote/EmissaoLote";
 import { Clientes } from "./pages/clientes/Clientes";
 import { Historico } from "./pages/historico/Historico";
 import { Preview } from "./pages/preview/Preview";
+import { Usuarios } from "./pages/usuarios/Usuarios";
 
 function ProtectedRoutes() {
   const { user, loading } = useAuth();
@@ -48,6 +49,7 @@ function App() {
           <Route path="/boleto" element={<Boleto />} />
           <Route path="/lote" element={<EmissaoLote />} />
           <Route path="/clientes" element={<Clientes />} />
+          <Route path="/usuarios" element={<Usuarios />} />
           <Route path="/historico" element={<Historico />} />
           <Route path="/documento/:id" element={<Preview />} />
           <Route path="/documento" element={<Preview />} />
