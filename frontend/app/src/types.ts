@@ -47,6 +47,35 @@ export interface Documento {
   criado_em?: string;
 }
 
+export interface ConfigNfse {
+  ambiente: "homologacao" | "producao";
+  item_lista: string;
+  cnae: string;
+  cod_tributacao_municipio: string;
+  aliquota: string;
+  discriminacao: string;
+  regime: string;
+  optante_simples: boolean;
+  iss_retido: boolean;
+}
+
+export interface ConfigBoleto {
+  banco: string;
+  carteira: string;
+  especie: string;
+  multa: string;
+  juros: string;
+  desconto: string;
+  dias_vencimento: number;
+  instrucoes: string;
+}
+
+export interface Configuracoes {
+  nfse: ConfigNfse;
+  boleto: ConfigBoleto;
+  atualizado_em?: string;
+}
+
 export interface Estatisticas {
   nfse_emitidas: number;
   boletos_gerados: number;

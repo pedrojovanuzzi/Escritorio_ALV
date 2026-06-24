@@ -7,6 +7,7 @@ import Cliente from "./routes/Cliente.routes";
 import Documento from "./routes/Documento.routes";
 import Nfse from "./routes/Nfse.routes";
 import Usuario from "./routes/Usuario.routes";
+import Configuracao from "./routes/Configuracao.routes";
 
 export class App {
   public server: express.Application;
@@ -33,5 +34,6 @@ export class App {
     this.server.use("/api/documentos", Documento);
     this.server.use("/api/nfse", Nfse);
     this.server.use("/api/usuarios", Usuario);
+    this.server.use("/api/configuracoes", Configuracao);
   }
 }

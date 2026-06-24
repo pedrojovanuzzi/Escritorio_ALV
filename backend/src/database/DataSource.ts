@@ -4,6 +4,7 @@ import path from "path";
 import { User } from "../entities/User";
 import { Cliente } from "../entities/Cliente";
 import { Documento } from "../entities/Documento";
+import { Configuracao } from "../entities/Configuracao";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -14,7 +15,7 @@ const AppDataSource = new DataSource({
   username: process.env.DATABASE_USERNAME,
   password: process.env.DATABASE_PASSWORD,
   database: process.env.DATABASE,
-  entities: [User, Cliente, Documento],
+  entities: [User, Cliente, Documento, Configuracao],
   migrations: [
     path.join(__dirname, "../migration/*.{ts,js}").replace(/\\/g, "/"),
   ],

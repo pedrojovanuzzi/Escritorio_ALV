@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import AppDataSource from "../database/DataSource";
 import { Cliente } from "../entities/Cliente";
+import { parseClientesTxt } from "../services/clientes/ClientesTxtParser";
 
 class ClienteController {
   constructor() {
@@ -9,6 +10,72 @@ class ClienteController {
     this.criar = this.criar.bind(this);
     this.atualizar = this.atualizar.bind(this);
     this.remover = this.remover.bind(this);
+    this.importarPreview = this.importarPreview.bind(this);
+    this.importar = this.importar.bind(this);
+  }
+
+  /** Lê um TXT (fixed-width) e devolve os clientes extraídos, sem gravar. */
+  public async importarPreview(req: Request, res: Response) {
+    try {
+      if (!req.file) {
+        res.status(400).json({ errors: ["Envie o arquivo no campo 'arquivo'."] });
+        return;
+      }
+      const resultado = parseClientesTxt(req.file.buffer);
+      res.json(resultado);
+    } catch (err) {
+      console.error("Erro ao ler TXT de clientes:", err);
+      res.status(500).json({ errors: ["Erro ao interpretar o arquivo."] });
+    }
+  }
+
+  /** Grava no cadastro os clientes confirmados (vindos do preview). */
+  public async importar(req: Request, res: Response) {
+    try {
+      const repo = AppDataSource.getRepository(Cliente);
+      const { clientes } = req.body as { clientes: any[] };
+
+      if (!Array.isArray(clientes) || clientes.length === 0) {
+        res.status(400).json({ errors: ["Nenhum cliente para importar."] });
+        return;
+      }
+
+      let inseridos = 0;
+      let ignorados = 0;
+
+      for (const c of clientes) {
+        const nome = (c.nome || "").trim();
+        if (!nome) {
+          ignorados++;
+          continue;
+        }
+        // Dedup leve por nome + cidade (evita duplicar reimportações).
+        const existe = await repo.findOne({
+          where: { nome, municipio: c.cidade || undefined },
+        });
+        if (existe) {
+          ignorados++;
+          continue;
+        }
+        await repo.save(
+          repo.create({
+            nome,
+            doc: c.doc || "",
+            tipo: "PJ",
+            endereco: c.endereco || undefined,
+            municipio: c.cidade || undefined,
+            uf: c.uf || undefined,
+            cep: c.cep || undefined,
+          })
+        );
+        inseridos++;
+      }
+
+      res.status(201).json({ inseridos, ignorados, total: clientes.length });
+    } catch (err) {
+      console.error("Erro ao importar clientes:", err);
+      res.status(500).json({ errors: ["Erro ao importar clientes."] });
+    }
   }
 
   public async listar(req: Request, res: Response) {

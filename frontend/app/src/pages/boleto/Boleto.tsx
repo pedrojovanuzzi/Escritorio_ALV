@@ -24,6 +24,23 @@ export const Boleto = () => {
 
   useEffect(() => {
     api.get("/clientes").then((r) => setClientes(r.data)).catch(() => {});
+    // Carrega os padrões definidos em Configurações.
+    api
+      .get("/configuracoes")
+      .then((r) => {
+        const c = r.data?.boleto;
+        if (!c) return;
+        if (c.banco) setBanco(c.banco);
+        if (c.multa) setMulta(c.multa);
+        if (c.juros) setJuros(c.juros);
+        if (c.instrucoes) setInstrucoes(c.instrucoes);
+        if (c.dias_vencimento) {
+          const d = new Date();
+          d.setDate(d.getDate() + Number(c.dias_vencimento));
+          setVencimento(d.toLocaleDateString("pt-BR"));
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const cliente = clientes[idx];

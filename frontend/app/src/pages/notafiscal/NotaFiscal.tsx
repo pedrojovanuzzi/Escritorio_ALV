@@ -26,6 +26,19 @@ export const NotaFiscal = () => {
 
   useEffect(() => {
     api.get("/clientes").then((r) => setClientes(r.data)).catch(() => {});
+    // Carrega os padrões definidos em Configurações.
+    api
+      .get("/configuracoes")
+      .then((r) => {
+        const c = r.data?.nfse;
+        if (!c) return;
+        setAmbiente(c.ambiente === "producao" ? "producao" : "homologacao");
+        if (c.item_lista) setItemLista(c.item_lista);
+        if (c.cnae) setCnae(c.cnae);
+        if (c.aliquota) setAliquota(c.aliquota);
+        if (c.discriminacao) setDiscriminacao(c.discriminacao);
+      })
+      .catch(() => {});
   }, []);
 
   const cliente = clientes[idx];

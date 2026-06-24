@@ -40,6 +40,9 @@ export class Cliente {
   @Column({ type: "varchar", length: 120, nullable: true })
   municipio?: string;
 
+  @Column({ type: "varchar", length: 2, nullable: true })
+  uf?: string;
+
   @Column({ type: "varchar", length: 9, nullable: true })
   cep?: string;
 

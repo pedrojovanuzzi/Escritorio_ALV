@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from "react";
-import { FiPlus, FiFileText, FiEdit2, FiX, FiTrash2 } from "react-icons/fi";
+import { FiPlus, FiFileText, FiEdit2, FiX, FiTrash2, FiUpload } from "react-icons/fi";
 import api from "../../api/api";
 import { Cliente } from "../../types";
 import { iniciais, corPorIndice } from "../../utils/format";
 import { Field, PrimaryButton } from "../../components/ui";
+import { ImportarClientesModal } from "../../components/ImportarClientesModal";
 
 const VAZIO: Cliente = { nome: "", doc: "", tipo: "PJ", email: "", municipio: "" };
 
 export const Clientes = () => {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [filtro, setFiltro] = useState<"" | "PJ" | "PF">("");
+  const [importar, setImportar] = useState(false);
   const [modal, setModal] = useState<Cliente | null>(null);
 
   function carregar() {
@@ -63,9 +65,17 @@ export const Clientes = () => {
           <Tab label="Pessoa Jurídica" count={pj} value="PJ" />
           <Tab label="Pessoa Física" count={pf} value="PF" />
         </div>
-        <PrimaryButton onClick={() => setModal({ ...VAZIO })} className="px-[18px] !h-10 !text-sm">
-          <FiPlus size={17} /> Novo cliente
-        </PrimaryButton>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setImportar(true)}
+            className="flex items-center gap-2 h-10 px-4 rounded-[11px] border-[1.5px] border-[#E2E8E6] bg-white text-sm font-semibold text-[#34433D] hover:border-brand hover:text-brand-dark"
+          >
+            <FiUpload size={16} /> Importar TXT
+          </button>
+          <PrimaryButton onClick={() => setModal({ ...VAZIO })} className="px-[18px] !h-10 !text-sm">
+            <FiPlus size={17} /> Novo cliente
+          </PrimaryButton>
+        </div>
       </div>
 
       <div className="bg-white border border-[#E7ECEA] rounded-2xl overflow-hidden">
@@ -169,6 +179,12 @@ export const Clientes = () => {
           </div>
         </div>
       )}
+
+      <ImportarClientesModal
+        aberto={importar}
+        onFechar={() => setImportar(false)}
+        onImportado={carregar}
+      />
     </div>
   );
 };

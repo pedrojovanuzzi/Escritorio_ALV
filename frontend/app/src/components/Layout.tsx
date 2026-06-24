@@ -11,6 +11,7 @@ import {
   FiBell,
   FiLogOut,
   FiUserCheck,
+  FiSettings,
 } from "react-icons/fi";
 import logo from "../assets/logo.png";
 import { useAuth } from "../context/AuthContext";
@@ -34,6 +35,10 @@ const TITULOS: Record<string, { title: string; subtitle: string }> = {
     title: "Usuários",
     subtitle: "Gerencie os acessos ao sistema",
   },
+  "/configuracoes": {
+    title: "Configurações",
+    subtitle: "Padrões de emissão de NFS-e e boletos",
+  },
   "/historico": {
     title: "Histórico de documentos",
     subtitle: "Documentos emitidos",
@@ -55,6 +60,9 @@ const NAV = [
     { to: "/usuarios", label: "Usuários", icon: FiUserCheck },
     { to: "/historico", label: "Histórico", icon: FiClock },
     { to: "/documento", label: "Documentos", icon: FiEye },
+  ]},
+  { secao: "Sistema", itens: [
+    { to: "/configuracoes", label: "Configurações", icon: FiSettings },
   ]},
 ];
 
