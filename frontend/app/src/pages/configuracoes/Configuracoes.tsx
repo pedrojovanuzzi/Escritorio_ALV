@@ -1,10 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { FiSave, FiCheckCircle } from "react-icons/fi";
 import api from "../../api/api";
-import { Configuracoes as Config, ConfigNfse, ConfigBoleto } from "../../types";
+import {
+  Configuracoes as Config,
+  ConfigNfse,
+  ConfigBoleto,
+  ConfigEmpresa,
+} from "../../types";
 import { Card, StepHeader, Field, PrimaryButton } from "../../components/ui";
 
 export const Configuracoes = () => {
+  const [empresa, setEmpresa] = useState<ConfigEmpresa | null>(null);
   const [nfse, setNfse] = useState<ConfigNfse | null>(null);
   const [boleto, setBoleto] = useState<ConfigBoleto | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -14,12 +20,16 @@ export const Configuracoes = () => {
     api
       .get<Config>("/configuracoes")
       .then((r) => {
+        setEmpresa(r.data.empresa);
         setNfse(r.data.nfse);
         setBoleto(r.data.boleto);
       })
       .catch(() => {});
   }, []);
 
+  function setE<K extends keyof ConfigEmpresa>(k: K, v: ConfigEmpresa[K]) {
+    setEmpresa((c) => (c ? { ...c, [k]: v } : c));
+  }
   function setN<K extends keyof ConfigNfse>(k: K, v: ConfigNfse[K]) {
     setNfse((c) => (c ? { ...c, [k]: v } : c));
   }
@@ -28,11 +38,11 @@ export const Configuracoes = () => {
   }
 
   async function salvar() {
-    if (!nfse || !boleto) return;
+    if (!empresa || !nfse || !boleto) return;
     setSalvando(true);
     setMsg("");
     try {
-      await api.put("/configuracoes", { nfse, boleto });
+      await api.put("/configuracoes", { empresa, nfse, boleto });
       setMsg("Configurações salvas com sucesso.");
       setTimeout(() => setMsg(""), 3500);
     } catch {
@@ -42,7 +52,7 @@ export const Configuracoes = () => {
     }
   }
 
-  if (!nfse || !boleto) {
+  if (!empresa || !nfse || !boleto) {
     return <div className="px-9 py-16 text-center text-[#9AA8A2]">Carregando…</div>;
   }
 
@@ -53,9 +63,47 @@ export const Configuracoes = () => {
         boletos. Você ainda pode ajustá-los individualmente em cada emissão.
       </p>
 
+      {/* Empresa emitente (prestador) */}
+      <Card className="mb-5">
+        <StepHeader n={1} title="Empresa emitente (prestador)" />
+        <p className="text-[12.5px] text-[#7A8A84] -mt-2 mb-4">
+          Estes são os seus dados — a empresa que emite a NFS-e (prestador) e cobra os boletos
+          (beneficiário).
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
+          <Field className="sm:col-span-4" label="Razão social" value={empresa.razao_social} onChange={(v) => setE("razao_social", v)} />
+          <Field className="sm:col-span-2" label="Nome fantasia" value={empresa.nome_fantasia} onChange={(v) => setE("nome_fantasia", v)} />
+          <Field className="sm:col-span-2" label="CNPJ" value={empresa.cnpj} onChange={(v) => setE("cnpj", v)} mono />
+          <Field className="sm:col-span-2" label="Inscrição municipal" value={empresa.inscricao_municipal} onChange={(v) => setE("inscricao_municipal", v)} mono />
+          <Field className="sm:col-span-2" label="Inscrição estadual" value={empresa.inscricao_estadual} onChange={(v) => setE("inscricao_estadual", v)} mono />
+          <Field className="sm:col-span-2" label="CNAE" value={empresa.cnae} onChange={(v) => setE("cnae", v)} mono />
+          <Field className="sm:col-span-2" label="Cód. município (IBGE)" value={empresa.codigo_municipio} onChange={(v) => setE("codigo_municipio", v)} mono />
+          <Field className="sm:col-span-2" label="Telefone" value={empresa.telefone} onChange={(v) => setE("telefone", v)} mono />
+        </div>
+
+        <div className="text-[11px] font-bold tracking-[0.08em] uppercase text-[#9AA8A2] mt-5 mb-3">Endereço</div>
+        <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
+          <Field className="sm:col-span-4" label="Endereço" value={empresa.endereco} onChange={(v) => setE("endereco", v)} />
+          <Field className="sm:col-span-1" label="Número" value={empresa.numero} onChange={(v) => setE("numero", v)} mono />
+          <Field className="sm:col-span-1" label="CEP" value={empresa.cep} onChange={(v) => setE("cep", v)} mono />
+          <Field className="sm:col-span-2" label="Complemento" value={empresa.complemento} onChange={(v) => setE("complemento", v)} />
+          <Field className="sm:col-span-2" label="Bairro" value={empresa.bairro} onChange={(v) => setE("bairro", v)} />
+          <Field className="sm:col-span-1" label="Município" value={empresa.municipio} onChange={(v) => setE("municipio", v)} />
+          <Field className="sm:col-span-1" label="UF" value={empresa.uf} onChange={(v) => setE("uf", v.toUpperCase().slice(0, 2))} mono />
+          <Field className="sm:col-span-3" label="E-mail" value={empresa.email} onChange={(v) => setE("email", v)} />
+        </div>
+
+        <div className="text-[11px] font-bold tracking-[0.08em] uppercase text-[#9AA8A2] mt-5 mb-3">Dados bancários (boleto)</div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Field label="Banco" value={empresa.banco} onChange={(v) => setE("banco", v)} />
+          <Field label="Agência" value={empresa.agencia} onChange={(v) => setE("agencia", v)} mono />
+          <Field label="Conta" value={empresa.conta} onChange={(v) => setE("conta", v)} mono />
+        </div>
+      </Card>
+
       {/* NFS-e */}
       <Card className="mb-5">
-        <StepHeader n={1} title="NFS-e padrão" />
+        <StepHeader n={2} title="NFS-e padrão" />
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-[12.5px] font-semibold text-[#5A6A63] mb-1.5">
@@ -108,7 +156,7 @@ export const Configuracoes = () => {
 
       {/* Boleto */}
       <Card className="mb-5">
-        <StepHeader n={2} title="Boleto padrão" />
+        <StepHeader n={3} title="Boleto padrão" />
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-[12.5px] font-semibold text-[#5A6A63] mb-1.5">Banco</label>

@@ -11,6 +11,7 @@ import {
   WS_CREDENCIAIS,
 } from "../../config/nfse";
 import { codigoIbge } from "../../utils/municipios";
+import { getEmpresa } from "../configuracao/EmpresaConfig";
 import { NfseXmlFactory, DadosRps } from "./NfseXmlFactory";
 import { FiorilliProvider } from "./FiorilliProvider";
 
@@ -57,6 +58,7 @@ export interface ResultadoNfse {
   enviado: boolean; // true se foi transmitido ao webservice
   retornoWebservice?: any; // resposta crua/parseada do webservice
   aviso?: string; // mensagem quando o envio não pôde ser feito
+  prestador?: any; // dados da empresa emitente (para exibição no documento)
 }
 
 function gerarCodigoVerificacao(): string {
@@ -87,6 +89,21 @@ class NfseService {
     const numeroRps = dados.numeroRps ?? ++sequencialRps;
     const uuidLanc = uuidv4().replace(/-/g, "").slice(0, 20);
     const t = dados.tomador;
+
+    // Empresa emitente (prestador) — configurável em Configurações → Empresa.
+    const empresa = await getEmpresa();
+    const soDig = (s: any) => String(s ?? "").replace(/\D/g, "");
+    // Deriva o código IBGE do município/UF da empresa; o campo código_municipio
+    // serve apenas como override quando o nome não resolver.
+    const prestadorCodMun =
+      codigoIbge(empresa.municipio, empresa.uf) ||
+      (/^\d+$/.test(empresa.codigo_municipio || "") ? empresa.codigo_municipio : "") ||
+      PRESTADOR.codigoMunicipio;
+    const prestador = {
+      cnpj: soDig(empresa.cnpj) || PRESTADOR.cnpj,
+      inscricaoMunicipal: empresa.inscricao_municipal || PRESTADOR.inscricaoMunicipal,
+      cnae: soDig(dados.cnae) || soDig(empresa.cnae) || PRESTADOR.cnae,
+    };
     // O XML exige o código IBGE do município. Se já vier numérico, usa direto;
     // senão resolve a partir do nome da cidade + UF; senão cai no do prestador.
     let tomadorCodMun: string;
@@ -102,6 +119,7 @@ class NfseService {
     }
 
     const dadosRps: DadosRps = {
+      prestador,
       uuidLanc,
       numeroRps,
       serieRps: dados.serieRps || "1",
@@ -114,7 +132,7 @@ class NfseService {
       responsavelRetencao: dados.issRetido ? 1 : 2,
       itemListaServico: dados.item_lista || "14.02",
       discriminacao: (dados.discriminacao || "Prestação de serviços").replace(/[<>&]/g, " "),
-      codigoMunicipio: PRESTADOR.codigoMunicipio,
+      codigoMunicipio: prestadorCodMun,
       exigibilidadeIss: 1,
       tomadorCpfCnpj: t.doc || "",
       tomadorRazaoSocial: t.nome || "",
@@ -143,6 +161,7 @@ class NfseService {
       emitida_em: new Date().toISOString(),
       xmlAssinado: rpsXml,
       enviado: false,
+      prestador: { ...empresa, codigo_municipio: prestadorCodMun },
     };
 
     if (avisoMunicipio) base.aviso = avisoMunicipio;
@@ -163,7 +182,7 @@ class NfseService {
     const xmlAssinado = provider.assinarXml(rpsXml, `RPS${uuidLanc}`, senha);
     base.xmlAssinado = xmlAssinado;
 
-    const loteXml = this.xmlFactory.createLoteXml(`LOTE${uuidLanc}`, 1, xmlAssinado);
+    const loteXml = this.xmlFactory.createLoteXml(`LOTE${uuidLanc}`, 1, xmlAssinado, prestador);
     const soap = this.xmlFactory.createEnviarLoteSoap(
       loteXml,
       WS_CREDENCIAIS.username,

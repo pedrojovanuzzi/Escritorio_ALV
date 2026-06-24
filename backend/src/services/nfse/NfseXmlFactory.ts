@@ -1,6 +1,11 @@
-import { PRESTADOR } from "../../config/nfse";
+export interface PrestadorRps {
+  cnpj: string;
+  inscricaoMunicipal: string;
+  cnae: string;
+}
 
 export interface DadosRps {
+  prestador: PrestadorRps;
   uuidLanc: string;
   numeroRps: number;
   serieRps: string;
@@ -37,8 +42,6 @@ export interface DadosRps {
  * Monta os XMLs do padrão ABRASF 2.01 (provedor Fiorilli) — RPS, lote e envelope SOAP.
  */
 export class NfseXmlFactory {
-  private CNAE = PRESTADOR.cnae;
-
   private cleanXml(xml: string): string {
     return xml
       .replace(/[\r\n]+/g, "")
@@ -74,14 +77,14 @@ export class NfseXmlFactory {
             <IssRetido>${d.issRetido}</IssRetido>
             <ResponsavelRetencao>${d.responsavelRetencao}</ResponsavelRetencao>
             <ItemListaServico>${d.itemListaServico}</ItemListaServico>
-            <CodigoCnae>${this.CNAE}</CodigoCnae>
+            <CodigoCnae>${d.prestador.cnae}</CodigoCnae>
             <Discriminacao>${d.discriminacao}</Discriminacao>
             <CodigoMunicipio>${d.codigoMunicipio}</CodigoMunicipio>
             <ExigibilidadeISS>${d.exigibilidadeIss}</ExigibilidadeISS>
           </Servico>
           <Prestador>
-            <CpfCnpj><Cnpj>${PRESTADOR.cnpj}</Cnpj></CpfCnpj>
-            <InscricaoMunicipal>${PRESTADOR.inscricaoMunicipal}</InscricaoMunicipal>
+            <CpfCnpj><Cnpj>${d.prestador.cnpj}</Cnpj></CpfCnpj>
+            <InscricaoMunicipal>${d.prestador.inscricaoMunicipal}</InscricaoMunicipal>
           </Prestador>
           <Tomador>
             <IdentificacaoTomador>
@@ -118,13 +121,14 @@ export class NfseXmlFactory {
   createLoteXml(
     idLote: string,
     quantidadeRps: number,
-    listaRps: string
+    listaRps: string,
+    prestador: PrestadorRps
   ): string {
     const lote = `
       <LoteRps versao="2.01" Id="${idLote}">
         <NumeroLote>1</NumeroLote>
-        <CpfCnpj><Cnpj>${PRESTADOR.cnpj}</Cnpj></CpfCnpj>
-        <InscricaoMunicipal>${PRESTADOR.inscricaoMunicipal}</InscricaoMunicipal>
+        <CpfCnpj><Cnpj>${prestador.cnpj}</Cnpj></CpfCnpj>
+        <InscricaoMunicipal>${prestador.inscricaoMunicipal}</InscricaoMunicipal>
         <QuantidadeRps>${quantidadeRps}</QuantidadeRps>
         <ListaRps>${listaRps}</ListaRps>
       </LoteRps>
@@ -155,9 +159,10 @@ export class NfseXmlFactory {
   createConsultaNfseRpsEnvio(
     numero: string | number,
     serie: string,
-    tipo: string
+    tipo: string,
+    prestador: PrestadorRps
   ): string {
-    const dados = `<IdentificacaoRps><Numero>${numero}</Numero><Serie>${serie}</Serie><Tipo>${tipo}</Tipo></IdentificacaoRps><Prestador><CpfCnpj><Cnpj>${PRESTADOR.cnpj}</Cnpj></CpfCnpj><InscricaoMunicipal>${PRESTADOR.inscricaoMunicipal}</InscricaoMunicipal></Prestador>`;
+    const dados = `<IdentificacaoRps><Numero>${numero}</Numero><Serie>${serie}</Serie><Tipo>${tipo}</Tipo></IdentificacaoRps><Prestador><CpfCnpj><Cnpj>${prestador.cnpj}</Cnpj></CpfCnpj><InscricaoMunicipal>${prestador.inscricaoMunicipal}</InscricaoMunicipal></Prestador>`;
     return `<ConsultarNfseRpsEnvio xmlns="http://www.abrasf.org.br/nfse.xsd">${dados}</ConsultarNfseRpsEnvio>`;
   }
 

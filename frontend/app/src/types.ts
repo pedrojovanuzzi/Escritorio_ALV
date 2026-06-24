@@ -81,7 +81,32 @@ export interface ConfigBoleto {
   instrucoes: string;
 }
 
+export interface ConfigEmpresa {
+  razao_social: string;
+  nome_fantasia: string;
+  cnpj: string;
+  inscricao_municipal: string;
+  inscricao_estadual: string;
+  codigo_municipio: string;
+  cnae: string;
+  regime: string;
+  optante_simples: boolean;
+  endereco: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
+  municipio: string;
+  uf: string;
+  cep: string;
+  telefone: string;
+  email: string;
+  banco: string;
+  agencia: string;
+  conta: string;
+}
+
 export interface Configuracoes {
+  empresa: ConfigEmpresa;
   nfse: ConfigNfse;
   boleto: ConfigBoleto;
   atualizado_em?: string;

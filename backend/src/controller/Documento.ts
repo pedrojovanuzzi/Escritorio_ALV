@@ -4,6 +4,7 @@ import AppDataSource from "../database/DataSource";
 import { Documento } from "../entities/Documento";
 import NfseService from "../services/nfse/NfseService";
 import BoletoService from "../services/boleto/BoletoService";
+import { getEmpresa } from "../services/configuracao/EmpresaConfig";
 
 class DocumentoController {
   constructor() {
@@ -107,6 +108,7 @@ class DocumentoController {
       const dados = req.body;
 
       const resultado = await BoletoService.registrar(dados);
+      const beneficiario = await getEmpresa();
 
       const doc = repo.create({
         tipo: "BOLETO",
@@ -116,7 +118,7 @@ class DocumentoController {
         valor: dados.valor,
         status: "Em aberto",
         linha_digitavel: resultado.linha_digitavel,
-        dados: { ...dados, ...resultado },
+        dados: { ...dados, ...resultado, beneficiario },
       });
       const salvo = await repo.save(doc);
       res.status(201).json(salvo);

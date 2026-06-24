@@ -15,6 +15,9 @@ export class Configuracao {
   id?: number;
 
   @Column({ type: "json", nullable: true })
+  empresa?: any;
+
+  @Column({ type: "json", nullable: true })
   nfse?: any;
 
   @Column({ type: "json", nullable: true })

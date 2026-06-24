@@ -48,3 +48,35 @@ export const WS_CREDENCIAIS = {
   username: process.env.NFSE_WS_USERNAME || "",
   password: process.env.NFSE_WS_PASSWORD || "",
 };
+
+/**
+ * Dados padrão da empresa emitente (prestador). Usados quando ainda não há
+ * configuração salva no banco (tela Configurações → Empresa emitente).
+ * Os valores vêm do .env para manter o comportamento atual.
+ */
+export const EMPRESA_PADRAO = {
+  razao_social: process.env.NFSE_PRESTADOR_RAZAO || "Escritório Alvorada Contabilidade",
+  nome_fantasia: process.env.NFSE_PRESTADOR_FANTASIA || "Alvorada Contabilidade",
+  cnpj: PRESTADOR.cnpj,
+  inscricao_municipal: PRESTADOR.inscricaoMunicipal,
+  inscricao_estadual: "",
+  codigo_municipio: PRESTADOR.codigoMunicipio,
+  cnae: PRESTADOR.cnae,
+  regime: "Simples Nacional",
+  optante_simples: true,
+  endereco: "",
+  numero: "",
+  complemento: "",
+  bairro: "",
+  municipio: "Bauru",
+  uf: "SP",
+  cep: "",
+  telefone: "",
+  email: "",
+  // Dados bancários do beneficiário (boleto)
+  banco: "",
+  agencia: "",
+  conta: "",
+};
+
+export type EmpresaConfig = typeof EMPRESA_PADRAO;

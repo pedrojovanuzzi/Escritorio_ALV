@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import AppDataSource from "../database/DataSource";
 import { Configuracao } from "../entities/Configuracao";
+import { EMPRESA_PADRAO } from "../config/nfse";
 
 /** Defaults usados quando ainda não há configuração salva. */
 const NFSE_PADRAO = {
@@ -48,6 +49,7 @@ class ConfiguracaoController {
     try {
       const config = await this.getOrCreate();
       res.json({
+        empresa: { ...EMPRESA_PADRAO, ...(config.empresa || {}) },
         nfse: { ...NFSE_PADRAO, ...(config.nfse || {}) },
         boleto: { ...BOLETO_PADRAO, ...(config.boleto || {}) },
         atualizado_em: config.atualizado_em,
@@ -62,13 +64,15 @@ class ConfiguracaoController {
     try {
       const repo = AppDataSource.getRepository(Configuracao);
       const config = await this.getOrCreate();
-      const { nfse, boleto } = req.body;
+      const { empresa, nfse, boleto } = req.body;
 
+      if (empresa) config.empresa = { ...EMPRESA_PADRAO, ...config.empresa, ...empresa };
       if (nfse) config.nfse = { ...NFSE_PADRAO, ...config.nfse, ...nfse };
       if (boleto) config.boleto = { ...BOLETO_PADRAO, ...config.boleto, ...boleto };
 
       const salvo = await repo.save(config);
       res.json({
+        empresa: salvo.empresa,
         nfse: salvo.nfse,
         boleto: salvo.boleto,
         atualizado_em: salvo.atualizado_em,

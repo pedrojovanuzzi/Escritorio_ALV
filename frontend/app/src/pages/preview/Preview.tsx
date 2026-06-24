@@ -67,6 +67,11 @@ function DocNfse({ doc, d, tomador }: { doc: Documento; d: any; tomador: any }) 
   const valor = Number(doc.valor);
   const aliq = d.aliquota ?? 5;
   const iss = d.valor_iss ?? +(valor * (aliq / 100)).toFixed(2);
+  const prest = d.prestador || {};
+  const prestEnd = [prest.endereco, prest.numero].filter(Boolean).join(", ") +
+    (prest.bairro ? ` — ${prest.bairro}` : "") +
+    (prest.municipio ? `, ${prest.municipio}` : "") +
+    (prest.uf ? `/${prest.uf}` : "");
   return (
     <div className="max-w-[820px] mx-auto bg-white border border-[#E2E8E6] rounded-lg shadow-[0_12px_40px_rgba(10,30,25,0.08)] overflow-hidden">
       <div className="bg-panel text-white px-[30px] py-[22px] flex items-center justify-between">
@@ -94,6 +99,18 @@ function DocNfse({ doc, d, tomador }: { doc: Documento; d: any; tomador: any }) 
         />
         <InfoCell label="Código de verificação" valor={doc.codigo_verificacao} mono semBorda />
       </div>
+
+      <Bloco titulo="Prestador de serviços">
+        <div className="grid grid-cols-[1.6fr_1fr] gap-y-1.5 gap-x-6 text-[13px] text-[#34433D] leading-relaxed">
+          <div>
+            <strong className="text-ink">{prest.razao_social || "—"}</strong>
+            {prest.nome_fantasia ? ` · ${prest.nome_fantasia}` : ""}
+          </div>
+          <div>CNPJ: <span className="font-mono">{prest.cnpj}</span></div>
+          <div>{prestEnd}</div>
+          <div>Insc. Municipal: <span className="font-mono">{prest.inscricao_municipal || "—"}</span></div>
+        </div>
+      </Bloco>
 
       <Bloco titulo="Tomador de serviços">
         <div className="grid grid-cols-[1.6fr_1fr] gap-y-1.5 gap-x-6 text-[13px] text-[#34433D] leading-relaxed">
@@ -125,7 +142,7 @@ function DocNfse({ doc, d, tomador }: { doc: Documento; d: any; tomador: any }) 
         </div>
       </div>
       <div className="px-[30px] py-3.5 bg-[#F7FAF9] text-[11.5px] text-[#9AA8A2] border-t border-[#EAEFED]">
-        Optante pelo Simples Nacional · ISS não retido · Documento emitido via Escritório Alvorada Contabilidade.
+        Optante pelo Simples Nacional · ISS não retido · Documento emitido por {prest.razao_social || "—"}.
       </div>
     </div>
   );
@@ -134,6 +151,10 @@ function DocNfse({ doc, d, tomador }: { doc: Documento; d: any; tomador: any }) 
 function DocBoleto({ doc, d, pagador }: { doc: Documento; d: any; pagador: any }) {
   const valor = Number(doc.valor);
   const linha = doc.linha_digitavel || d.linha_digitavel || "";
+  const benef = d.beneficiario || {};
+  const benefTexto = benef.razao_social
+    ? `${benef.razao_social}${benef.cnpj ? ` · CNPJ ${benef.cnpj}` : ""}`
+    : "—";
   return (
     <div className="max-w-[820px] mx-auto bg-white border border-[#E2E8E6] rounded-lg shadow-[0_12px_40px_rgba(10,30,25,0.08)] p-[30px] font-manrope">
       <div className="flex items-center justify-between border-b-2 border-panel pb-2.5 mb-1">
@@ -149,7 +170,7 @@ function DocBoleto({ doc, d, pagador }: { doc: Documento; d: any; pagador: any }
 
       <div className="border border-[#D7DFDC] rounded-md overflow-hidden">
         <div className="grid grid-cols-[1fr_200px] border-b border-[#E5EAE8]">
-          <BoletoCell label="Beneficiário" valor="Escritório Alvorada Contabilidade · CNPJ 20.843.290/0001-42" borda />
+          <BoletoCell label="Beneficiário" valor={benefTexto} borda />
           <BoletoCell label="Vencimento" valor={d.vencimento || "—"} mono />
         </div>
         <div className="grid grid-cols-[1fr_1fr_200px] border-b border-[#E5EAE8]">
