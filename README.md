@@ -67,12 +67,11 @@ npm start               # http://localhost:3000
 ```bash
 cd frontend/app
 npm install
-npm start        # http://localhost:3000 do CRA -> ajuste se conflitar com o backend
+npm start        # http://localhost:3001
 ```
 
-> O frontend aponta para a API via `REACT_APP_URL` (`frontend/app/.env`).
-> Se o backend já usa a porta 3000, rode o CRA em outra porta:
-> `set PORT=3001 && npm start` (Windows) ou `PORT=3001 npm start`.
+> O frontend roda na porta **3001** (`PORT=3001` em `frontend/app/.env`) e aponta
+> para a API do backend (porta 3000) via `REACT_APP_URL`.
 
 ## Telas
 
