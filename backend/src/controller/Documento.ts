@@ -73,7 +73,12 @@ class DocumentoController {
       const resultado = await NfseService.emitir({ ...dados, ambiente });
 
       // Se foi transmitida ao webservice => Autorizada; caso contrário, Rascunho (RPS montado).
-      const status = resultado.enviado ? "Autorizada" : "Rascunho";
+      // Só é "Autorizada" se a prefeitura confirmou; se transmitiu mas rejeitou => "Rejeitada".
+      const status = resultado.autorizada
+        ? "Autorizada"
+        : resultado.enviado
+        ? "Rejeitada"
+        : "Rascunho";
 
       const doc = repo.create({
         tipo: "NFSE",
@@ -92,6 +97,8 @@ class DocumentoController {
       res.status(201).json({
         ...salvo,
         enviado: resultado.enviado,
+        autorizada: resultado.autorizada,
+        mensagens: resultado.mensagens,
         aviso: resultado.aviso,
       });
     } catch (err: any) {

@@ -18,8 +18,24 @@ async function bootstrap() {
   }
 
   const app = new App();
-  app.server.listen(port, () => {
+  const server = app.server.listen(port, () => {
     console.log(`🚀 Servidor Alvorada ouvindo em http://localhost:${port}`);
+  });
+
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(
+        `\n⚠️  A porta ${port} já está em uso — provavelmente há outra instância do backend rodando.\n` +
+          `   • Feche o outro terminal que está com o servidor aberto, ou\n` +
+          `   • Use outra porta:  set PORT=3001 && npm start  (Windows)\n` +
+          `   Para liberar a porta ${port} no Windows:\n` +
+          `     netstat -ano | findstr :${port}\n` +
+          `     taskkill /PID <PID> /F\n`
+      );
+      process.exit(1);
+    }
+    console.error("❌ Erro no servidor:", err);
+    process.exit(1);
   });
 }
 

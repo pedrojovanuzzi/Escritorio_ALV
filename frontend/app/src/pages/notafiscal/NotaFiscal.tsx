@@ -69,10 +69,12 @@ export const NotaFiscal = () => {
         certPassword,
       });
       setSenhaModal(false);
-      if (data.aviso) {
-        alert(
-          `NFS-e registrada como rascunho (RPS montado), mas não foi transmitida:\n\n${data.aviso}`
-        );
+      if (data.enviado && data.autorizada === false) {
+        alert(`A prefeitura REJEITOU a NFS-e:\n\n${data.aviso || "Verifique o retorno do webservice."}`);
+      } else if (data.aviso) {
+        alert(`NFS-e não transmitida (RPS montado):\n\n${data.aviso}`);
+      } else if (data.autorizada) {
+        alert(`NFS-e autorizada pela prefeitura! Número: ${data.numero}`);
       }
       navigate(`/documento/${data.id}`);
     } catch (err: any) {

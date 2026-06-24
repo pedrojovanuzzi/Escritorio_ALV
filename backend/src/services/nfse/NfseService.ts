@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import { v4 as uuidv4 } from "uuid";
-import { parseStringPromise } from "xml2js";
+import { parseStringPromise, processors } from "xml2js";
 import {
   Ambiente,
   CERT_PATH,
@@ -56,10 +56,34 @@ export interface ResultadoNfse {
   emitida_em: string;
   xmlAssinado: string;
   enviado: boolean; // true se foi transmitido ao webservice
+  autorizada?: boolean; // true se a prefeitura efetivamente autorizou a NFS-e
+  mensagens?: Array<{ codigo?: string; mensagem?: string; correcao?: string }>;
   retornoWebservice?: any; // resposta crua/parseada do webservice
   aviso?: string; // mensagem quando o envio não pôde ser feito
   prestador?: any; // dados da empresa emitente (para exibição no documento)
 }
+
+/** Procura recursivamente todos os valores de uma tag (pelo nome local). */
+function coletar(obj: any, nome: string): any[] {
+  const alvo = nome.toLowerCase();
+  const achados: any[] = [];
+  const walk = (o: any) => {
+    if (!o || typeof o !== "object") return;
+    for (const k of Object.keys(o)) {
+      if (k.toLowerCase() === alvo) {
+        const v = o[k];
+        if (Array.isArray(v)) achados.push(...v);
+        else achados.push(v);
+      }
+      walk(o[k]);
+    }
+  };
+  walk(obj);
+  return achados;
+}
+
+const txt = (v: any): string =>
+  v == null ? "" : typeof v === "object" ? txt(v._ ?? v["#text"] ?? "") : String(v).trim();
 
 function gerarCodigoVerificacao(): string {
   return Math.random().toString(36).slice(2, 11).toUpperCase();
@@ -179,7 +203,8 @@ class NfseService {
 
     // Assina e envia.
     const provider = new FiorilliProvider(CERT_PATH, TEMP_DIR, getWsdlUrl(ambiente));
-    const xmlAssinado = provider.assinarXml(rpsXml, `RPS${uuidLanc}`, senha);
+    // Assina o elemento InfDeclaracaoPrestacaoServico (o Id "RPS..." vira o URI da referência).
+    const xmlAssinado = provider.assinarXml(rpsXml, "InfDeclaracaoPrestacaoServico", senha);
     base.xmlAssinado = xmlAssinado;
 
     const loteXml = this.xmlFactory.createLoteXml(`LOTE${uuidLanc}`, 1, xmlAssinado, prestador);
@@ -197,13 +222,53 @@ class NfseService {
 
     let parsed: any = retorno;
     try {
-      parsed = await parseStringPromise(retorno, { explicitArray: false });
+      parsed = await parseStringPromise(retorno, {
+        explicitArray: false,
+        tagNameProcessors: [processors.stripPrefix],
+      });
     } catch {
       /* mantém retorno cru se não for XML */
     }
 
     base.enviado = true;
     base.retornoWebservice = parsed;
+
+    // Interpreta a resposta da prefeitura.
+    const mensagensRaw = coletar(parsed, "MensagemRetorno");
+    const mensagens = mensagensRaw.map((m: any) => ({
+      codigo: txt(m?.Codigo),
+      mensagem: txt(m?.Mensagem),
+      correcao: txt(m?.Correcao),
+    }));
+    base.mensagens = mensagens;
+
+    // NFS-e autorizada => existe um nó Nfse/InfNfse com Numero e CodigoVerificacao.
+    const infNfse = coletar(parsed, "InfNfse")[0] || coletar(parsed, "Nfse")[0];
+    const numeroNfse = txt(infNfse?.Numero) || coletar(parsed, "Numero").map(txt).filter(Boolean)[0];
+    const codVerif =
+      txt(infNfse?.CodigoVerificacao) ||
+      coletar(parsed, "CodigoVerificacao").map(txt).filter(Boolean)[0];
+    const fault = coletar(parsed, "faultstring").map(txt).filter(Boolean)[0];
+
+    if ((infNfse && numeroNfse) || codVerif) {
+      // Autorizada: usa o número e código reais da prefeitura.
+      base.autorizada = true;
+      if (numeroNfse) base.numero = numeroNfse;
+      if (codVerif) base.codigo_verificacao = codVerif;
+    } else {
+      // Rejeitada ou falha: monta um aviso com as mensagens de erro.
+      base.autorizada = false;
+      const erros = mensagens
+        .map((m) => [m.codigo, m.mensagem, m.correcao].filter(Boolean).join(" — "))
+        .filter(Boolean);
+      const detalhe = erros.length
+        ? erros.join(" | ")
+        : fault || "A prefeitura não retornou a NFS-e. Verifique o retorno do webservice.";
+      base.aviso = [avisoMunicipio, `Rejeitada pela prefeitura: ${detalhe}`]
+        .filter(Boolean)
+        .join(" ");
+    }
+
     return base;
   }
 }

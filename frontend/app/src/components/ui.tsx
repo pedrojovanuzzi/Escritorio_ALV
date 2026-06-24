@@ -135,6 +135,7 @@ export function StatusBadge({ status }: { status?: string }) {
     Autorizada: { bg: "#E6F7F3", cor: "#0FB99A" },
     Pago: { bg: "#E6F7F3", cor: "#0FB99A" },
     "Em aberto": { bg: "#FBF2DC", cor: "#C98A0E" },
+    Rejeitada: { bg: "#FBE6E3", cor: "#C0392B" },
     Vencido: { bg: "#FBE6E3", cor: "#C0392B" },
     Cancelada: { bg: "#EEF1F0", cor: "#7A8A84" },
     Rascunho: { bg: "#EEF1F0", cor: "#7A8A84" },

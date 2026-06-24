@@ -9,6 +9,7 @@ export type TipoDocumento = "NFSE" | "BOLETO";
 export type StatusDocumento =
   | "Rascunho"
   | "Autorizada"
+  | "Rejeitada"
   | "Em aberto"
   | "Pago"
   | "Vencido"
