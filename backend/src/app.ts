@@ -5,6 +5,7 @@ import cors from "cors";
 import Auth from "./routes/Auth.Routes";
 import Cliente from "./routes/Cliente.routes";
 import Documento from "./routes/Documento.routes";
+import Nfse from "./routes/Nfse.routes";
 
 export class App {
   public server: express.Application;
@@ -29,5 +30,6 @@ export class App {
     this.server.use("/api/auth", Auth);
     this.server.use("/api/clientes", Cliente);
     this.server.use("/api/documentos", Documento);
+    this.server.use("/api/nfse", Nfse);
   }
 }

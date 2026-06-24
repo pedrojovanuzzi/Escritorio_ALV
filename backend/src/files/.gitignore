@@ -1,0 +1,5 @@
+# certificado e temporários do NFS-e
+*.pfx
+*.tmp
+decrypted_certificado.*
+new_certificado.*

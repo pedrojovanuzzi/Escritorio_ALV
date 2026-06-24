@@ -85,10 +85,47 @@ npm start        # http://localhost:3001
 | `/historico`    | Cards de resumo + histórico de documentos       |
 | `/documento/:id`| Visualização/impressão da NFS-e ou boleto       |
 
+## NFS-e — homologação e produção
+
+A emissão de NFS-e já está montada no padrão **ABRASF 2.01 (provedor Fiorilli)** com
+assinatura via **certificado A1**:
+
+- **Ambiente** — o formulário de Nota Fiscal tem um seletor **Homologação / Produção**.
+  Cada ambiente usa uma WSDL diferente (configurável no `.env`).
+- **Certificado A1** — envie o `.pfx` pela própria tela (botão "Enviar certificado") ou
+  via `POST /api/nfse/certificado` (campo `certificado`). Ele é salvo em
+  `backend/src/files/certificado.pfx` (não versionado).
+- **Fluxo** — o serviço monta o RPS ABRASF, **assina** com o A1 e **transmite** o lote
+  SOAP ao webservice do ambiente escolhido. Sem certificado/senha, a nota é gravada como
+  **rascunho** com o RPS já montado e um aviso (envio plugável).
+
+Configure no `backend/.env` (veja `.env.template`):
+
+| Variável | Descrição |
+| --- | --- |
+| `NFSE_CERT_PATH` | Caminho do `.pfx` (vazio = usa `files/certificado.pfx`) |
+| `NFSE_CERT_PASSWORD` | Senha do certificado A1 |
+| `NFSE_WSDL_HOMOLOGACAO` / `NFSE_WSDL_PRODUCAO` | Endpoints por ambiente |
+| `NFSE_WS_USERNAME` / `NFSE_WS_PASSWORD` | Credenciais do webservice (se exigidas) |
+| `NFSE_PRESTADOR_CNPJ` / `_IM` / `NFSE_CODIGO_MUNICIPIO` / `NFSE_CNAE` | Dados do emitente |
+
+Endpoints NFS-e:
+
+```
+GET  /api/nfse/certificado/status   -> { configurado, caminho }
+POST /api/nfse/certificado          -> upload do .pfx (multipart, campo "certificado")
+POST /api/documentos/nfse           -> emite (body inclui "ambiente": "homologacao" | "producao")
+```
+
+> ⚠️ As WSDLs padrão apontam para o provedor Fiorilli (homologação) e Arealva/SP
+> (produção, herdado do Wip). **Ajuste `NFSE_WSDL_PRODUCAO` para o webservice do seu
+> município** antes de emitir em produção.
+
 ## Próximos passos (integração real)
 
-1. **NFS-e** — implementar `NfseService.emitir` com SOAP/REST da prefeitura de Bauru,
-   assinatura XML com certificado A1 (`node-forge` + `xml-crypto`), montagem do RPS ABRASF.
+1. **NFS-e** — apontar `NFSE_WSDL_PRODUCAO` para a prefeitura correta, ajustar
+   regime/alíquota e tratar o retorno do webservice (número/código de verificação reais)
+   em `NfseService` a partir de `retornoWebservice`.
 2. **Boleto** — implementar `BoletoService.registrar` com a API do banco (nosso número,
    dígito verificador, linha digitável e código de barras reais).
 3. Endurecer a autenticação (refresh token, rate limit) e versionar novas migrations.

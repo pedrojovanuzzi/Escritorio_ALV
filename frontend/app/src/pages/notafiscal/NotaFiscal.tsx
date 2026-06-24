@@ -4,6 +4,8 @@ import { FiCheckCircle, FiUsers } from "react-icons/fi";
 import api from "../../api/api";
 import { Cliente } from "../../types";
 import { Card, StepHeader, Field, PrimaryButton, ResumoBox } from "../../components/ui";
+import { AmbienteCertificado, Ambiente } from "../../components/AmbienteCertificado";
+import { SenhaCertificadoModal } from "../../components/SenhaCertificadoModal";
 import { fmtBRL, parseValor } from "../../utils/format";
 
 export const NotaFiscal = () => {
@@ -11,6 +13,7 @@ export const NotaFiscal = () => {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [idx, setIdx] = useState(0);
   const [edits, setEdits] = useState<Partial<Cliente>>({});
+  const [ambiente, setAmbiente] = useState<Ambiente>("homologacao");
   const [valor, setValor] = useState("98,00");
   const [aliquota, setAliquota] = useState("5,00");
   const [discriminacao, setDiscriminacao] = useState(
@@ -19,6 +22,7 @@ export const NotaFiscal = () => {
   const [itemLista, setItemLista] = useState("14.02.01");
   const [cnae, setCnae] = useState("6209100");
   const [enviando, setEnviando] = useState(false);
+  const [senhaModal, setSenhaModal] = useState(false);
 
   useEffect(() => {
     api.get("/clientes").then((r) => setClientes(r.data)).catch(() => {});
@@ -35,11 +39,12 @@ export const NotaFiscal = () => {
     setEdits((e) => ({ ...e, [campo]: v }));
   }
 
-  async function emitir() {
+  async function emitir(certPassword: string) {
     if (!cliente) return;
     setEnviando(true);
     try {
       const { data } = await api.post("/documentos/nfse", {
+        ambiente,
         cliente_id: cliente.id,
         cliente_nome: tomador.nome,
         valor: valorNum,
@@ -48,10 +53,17 @@ export const NotaFiscal = () => {
         item_lista: itemLista,
         cnae,
         tomador,
+        certPassword,
       });
+      setSenhaModal(false);
+      if (data.aviso) {
+        alert(
+          `NFS-e registrada como rascunho (RPS montado), mas não foi transmitida:\n\n${data.aviso}`
+        );
+      }
       navigate(`/documento/${data.id}`);
-    } catch {
-      alert("Erro ao emitir NFS-e.");
+    } catch (err: any) {
+      alert(err?.response?.data?.errors?.[0] || "Erro ao emitir NFS-e.");
     } finally {
       setEnviando(false);
     }
@@ -60,6 +72,9 @@ export const NotaFiscal = () => {
   return (
     <div className="px-9 pt-[30px] pb-[60px] grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-[26px] items-start">
       <div className="flex flex-col gap-5">
+        {/* Ambiente + certificado */}
+        <AmbienteCertificado ambiente={ambiente} setAmbiente={setAmbiente} />
+
         {/* 1 - Tomador */}
         <Card>
           <StepHeader n={1} title="Tomador do serviço" />
@@ -149,14 +164,28 @@ export const NotaFiscal = () => {
           totalLabel="Valor líquido"
           totalValor={fmtBRL(valorNum)}
         />
-        <PrimaryButton onClick={emitir} disabled={enviando || !cliente} className="w-full">
+        <PrimaryButton
+          onClick={() => setSenhaModal(true)}
+          disabled={enviando || !cliente}
+          className="w-full"
+        >
           <FiCheckCircle size={18} />
-          {enviando ? "Emitindo…" : "Emitir NFS-e"}
+          {enviando
+            ? "Emitindo…"
+            : `Emitir NFS-e (${ambiente === "producao" ? "Produção" : "Homologação"})`}
         </PrimaryButton>
         <button className="w-full h-11 bg-white text-[#34433D] border-[1.5px] border-[#E2E8E6] rounded-xl text-sm font-semibold hover:border-brand hover:text-brand-dark">
           Salvar rascunho
         </button>
       </div>
+
+      <SenhaCertificadoModal
+        aberto={senhaModal}
+        ambiente={ambiente}
+        enviando={enviando}
+        onCancelar={() => setSenhaModal(false)}
+        onConfirmar={(senha) => emitir(senha)}
+      />
     </div>
   );
 };

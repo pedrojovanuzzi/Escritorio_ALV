@@ -37,6 +37,10 @@ export class Documento {
   @Column({ type: "varchar", length: 20, default: "Rascunho" })
   status?: StatusDocumento;
 
+  // Ambiente da emissão da NFS-e: 'homologacao' | 'producao'
+  @Column({ type: "varchar", length: 12, nullable: true })
+  ambiente?: string;
+
   @Column({ type: "varchar", length: 16, nullable: true })
   codigo_verificacao?: string; // NFS-e
 

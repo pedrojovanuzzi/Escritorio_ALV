@@ -47,8 +47,12 @@ class DocumentoController {
     try {
       const repo = AppDataSource.getRepository(Documento);
       const dados = req.body;
+      const ambiente = dados.ambiente === "producao" ? "producao" : "homologacao";
 
-      const resultado = await NfseService.emitir(dados);
+      const resultado = await NfseService.emitir({ ...dados, ambiente });
+
+      // Se foi transmitida ao webservice => Autorizada; caso contrário, Rascunho (RPS montado).
+      const status = resultado.enviado ? "Autorizada" : "Rascunho";
 
       const doc = repo.create({
         tipo: "NFSE",
@@ -56,15 +60,24 @@ class DocumentoController {
         cliente_id: dados.cliente_id,
         cliente_nome: dados.cliente_nome,
         valor: dados.valor,
-        status: "Autorizada",
+        status,
+        ambiente,
         codigo_verificacao: resultado.codigo_verificacao,
-        dados: { ...dados, ...resultado },
+        // não persistir a senha do certificado
+        dados: { ...dados, certPassword: undefined, ...resultado },
       });
       const salvo = await repo.save(doc);
-      res.status(201).json(salvo);
-    } catch (err) {
-      console.error("Erro ao emitir NFS-e:", err);
-      res.status(500).json({ errors: ["Erro ao emitir NFS-e."] });
+
+      res.status(201).json({
+        ...salvo,
+        enviado: resultado.enviado,
+        aviso: resultado.aviso,
+      });
+    } catch (err: any) {
+      console.error("Erro ao emitir NFS-e:", err?.message || err);
+      res
+        .status(500)
+        .json({ errors: ["Erro ao emitir NFS-e: " + (err?.message || "falha desconhecida")] });
     }
   }
 
