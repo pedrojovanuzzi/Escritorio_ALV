@@ -10,6 +10,17 @@ export interface ClienteImportado {
   cidade: string;
   uf: string;
   cep: string;
+  numero?: string;
+  bairro?: string;
+  complemento?: string;
+  email?: string;
+  inscricao_municipal?: string;
+  inscricao_estadual?: string;
+  cnae?: string;
+  contador?: string;
+  responsavel_legal?: string;
+  natureza_juridica?: string;
+  capital_social?: string;
 }
 
 export interface ResultadoImport {
@@ -17,7 +28,7 @@ export interface ResultadoImport {
   total_declarado: number | null;
   total_lido: number;
   encoding: string;
-  formato: "tab" | "colunas";
+  formato: "tab" | "colunas" | "ficha";
   avisos: string[];
 }
 
@@ -266,17 +277,111 @@ function parseColunas(linhas: string[], encoding: string): ResultadoImport {
   };
 }
 
+/* ----------------------- formato ficha (Rótulo: valor) ----------------------- */
+
+const normLabel = (s: string) =>
+  semAcento(s).replace(/:$/, "").replace(/\s+/g, " ").trim();
+
+// Detecta o formato de ficha detalhada pela presença de rótulos conhecidos.
+function pareceFicha(texto: string): boolean {
+  const s = semAcento(texto);
+  const labels = [
+    "razao social:",
+    "municipio:",
+    "endereco:",
+    "cep:",
+    "nome fantasia:",
+    "insc. municipal:",
+    "codigo:",
+  ];
+  let n = 0;
+  for (const l of labels) if (s.includes(l)) n++;
+  return n >= 3;
+}
+
+function fichaParaCliente(m: Map<string, string>): ClienteImportado {
+  const g = (k: string) => (m.get(k) || "").trim();
+  return {
+    codigo: g("codigo"),
+    nome: g("razao social") || g("nome"),
+    fantasia: g("nome fantasia") || g("apelido"),
+    doc: g("cnpj/cpf/cei/caepf") || g("cnpj"),
+    telefone: g("telefone"),
+    email: g("e-mail") || g("email"),
+    endereco: g("endereco"),
+    numero: g("numero"),
+    bairro: g("bairro"),
+    complemento: g("complemento"),
+    cidade: g("municipio"),
+    uf: g("uf"),
+    cep: g("cep"),
+    inscricao_municipal: g("insc. municipal") || g("inscricao municipal"),
+    inscricao_estadual: g("insc. estadual") || g("inscricao estadual"),
+    cnae: g("cnae 2.3") || g("cnae 2.0") || g("cnae"),
+    contador: g("contador"),
+    responsavel_legal: g("responsavel legal"),
+    natureza_juridica: g("natureza juridica"),
+    capital_social: g("capital social"),
+  };
+}
+
+function parseFicha(linhas: string[], encoding: string): ResultadoImport {
+  const blocos: Array<Map<string, string>> = [];
+  let atual: Map<string, string> | null = null;
+
+  for (const linha of linhas) {
+    const tokens = linha.split("\t").map((t) => t.trim());
+    for (let i = 0; i < tokens.length; i++) {
+      const tk = tokens[i];
+      if (tk.length > 1 && tk.endsWith(":")) {
+        const label = normLabel(tk);
+        const valor = (tokens[i + 1] || "").trim();
+        // "Código" marca o início de uma nova ficha de cliente.
+        if (label === "codigo" && atual && atual.size > 0) {
+          blocos.push(atual);
+          atual = null;
+        }
+        if (!atual) atual = new Map();
+        if (valor) atual.set(label, valor);
+      }
+    }
+  }
+  if (atual && atual.size > 0) blocos.push(atual);
+
+  const clientes = blocos
+    .map(fichaParaCliente)
+    .filter((c) => c.nome || c.doc);
+
+  const avisos: string[] = [];
+  if (clientes.length === 0)
+    avisos.push("Nenhum cliente reconhecido no arquivo (formato de ficha).");
+
+  return {
+    clientes,
+    total_declarado: null,
+    total_lido: clientes.length,
+    encoding,
+    formato: "ficha",
+    avisos,
+  };
+}
+
 /* ------------------------------- entrada ------------------------------- */
 
 export function parseClientesTxt(buffer: Buffer): ResultadoImport {
   const { texto, encoding } = decodificar(buffer);
   const linhas = texto.replace(/\f/g, "\n").split(/\r?\n/);
   const naoVazias = linhas.filter((l) => l.trim());
-  const comTab = naoVazias.filter((l) => l.includes("\t")).length;
 
-  // Maioria das linhas com TAB => formato separado por tabulação.
+  // 1) Ficha detalhada (Rótulo: valor).
+  if (pareceFicha(texto)) return parseFicha(naoVazias, encoding);
+
+  // 2) Maioria das linhas com TAB => uma linha por cliente.
+  const comTab = naoVazias.filter((l) => l.includes("\t")).length;
   if (naoVazias.length > 0 && comTab / naoVazias.length >= 0.5) {
     return parseTab(naoVazias, encoding);
   }
+
+  // 3) Colunas de largura fixa (relatório).
   return parseColunas(linhas, encoding);
 }

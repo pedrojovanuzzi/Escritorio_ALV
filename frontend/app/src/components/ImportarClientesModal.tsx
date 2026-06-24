@@ -3,6 +3,11 @@ import { FiX, FiUploadCloud, FiAlertTriangle, FiCheckCircle } from "react-icons/
 import api from "../api/api";
 import { PrimaryButton } from "./ui";
 
+interface Alteracao {
+  campo: string;
+  de: string;
+  para: string;
+}
 interface ClienteLido {
   codigo: string;
   nome: string;
@@ -13,6 +18,13 @@ interface ClienteLido {
   cidade: string;
   uf: string;
   cep: string;
+  numero?: string;
+  bairro?: string;
+  complemento?: string;
+  email?: string;
+  inscricao_municipal?: string;
+  status?: "novo" | "alterado" | "igual";
+  alteracoes?: Alteracao[];
 }
 interface Preview {
   clientes: ClienteLido[];
@@ -21,6 +33,46 @@ interface Preview {
   encoding: string;
   formato: "tab" | "colunas";
   avisos: string[];
+  resumo?: { novos: number; alterados: number; iguais: number };
+}
+
+const ROTULO_CAMPO: Record<string, string> = {
+  nome: "Nome",
+  nome_fantasia: "Fantasia",
+  doc: "CNPJ/CPF",
+  telefone: "Telefone",
+  email: "E-mail",
+  inscricao_municipal: "Insc. municipal",
+  inscricao_estadual: "Insc. estadual",
+  cnae: "CNAE",
+  contador: "Contador",
+  responsavel_legal: "Responsável legal",
+  natureza_juridica: "Natureza jurídica",
+  capital_social: "Capital social",
+  endereco: "Endereço",
+  numero: "Número",
+  complemento: "Complemento",
+  bairro: "Bairro",
+  municipio: "Cidade",
+  uf: "UF",
+  cep: "CEP",
+};
+
+function StatusTag({ status }: { status?: string }) {
+  const map: Record<string, { bg: string; cor: string; txt: string }> = {
+    novo: { bg: "#E6F7F3", cor: "#0A9E84", txt: "Novo" },
+    alterado: { bg: "#FBF2DC", cor: "#C98A0E", txt: "Alterado" },
+    igual: { bg: "#EEF1F0", cor: "#7A8A84", txt: "Igual" },
+  };
+  const c = map[status || "igual"];
+  return (
+    <span
+      className="text-[11px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap"
+      style={{ background: c.bg, color: c.cor }}
+    >
+      {c.txt}
+    </span>
+  );
 }
 
 export function ImportarClientesModal({
@@ -82,7 +134,10 @@ export function ImportarClientesModal({
         clientes: preview.clientes,
       });
       alert(
-        `Importação concluída: ${data.inseridos} inserido(s), ${data.ignorados} ignorado(s) (já existentes).`
+        `Importação concluída:\n` +
+          `• ${data.inseridos} novo(s)\n` +
+          `• ${data.atualizados} atualizado(s)\n` +
+          `• ${data.inalterados} sem mudança`
       );
       reset();
       onImportado();
@@ -147,6 +202,13 @@ export function ImportarClientesModal({
                 </span>
               )}
               <span className="text-[#9AA8A2]">· encoding {preview.encoding}</span>
+              {preview.resumo && (
+                <span className="flex items-center gap-2">
+                  <span className="text-[#0A9E84] font-semibold">{preview.resumo.novos} novo(s)</span>
+                  <span className="text-[#C98A0E] font-semibold">{preview.resumo.alterados} alterado(s)</span>
+                  <span className="text-[#7A8A84] font-semibold">{preview.resumo.iguais} igual(is)</span>
+                </span>
+              )}
               {preview.avisos.map((a, i) => (
                 <span key={i} className="flex items-center gap-1.5 text-[#C98A0E] font-semibold">
                   <FiAlertTriangle size={14} /> {a}
@@ -158,6 +220,7 @@ export function ImportarClientesModal({
               <table className="w-full text-[13px] border-collapse">
                 <thead className="sticky top-0 bg-[#F4F7F6]">
                   <tr className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#9AA8A2]">
+                    <th className="text-left px-3 py-2.5 w-[84px]">Status</th>
                     <th className="text-left px-3 py-2.5 w-[52px]">Cód.</th>
                     <th className="text-left px-3 py-2.5">Nome</th>
                     <th className="text-left px-3 py-2.5 w-[150px]">CNPJ / CPF</th>
@@ -168,12 +231,28 @@ export function ImportarClientesModal({
                 </thead>
                 <tbody>
                   {preview.clientes.map((c, i) => (
-                    <tr key={i} className="border-t border-[#F2F5F4]">
+                    <tr key={i} className="border-t border-[#F2F5F4] align-top">
+                      <td className="px-3 py-2">
+                        <StatusTag status={c.status} />
+                      </td>
                       <td className="px-3 py-2 font-mono text-[#5A6A63]">{c.codigo}</td>
                       <td className="px-3 py-2">
                         <div className="font-semibold text-ink">{c.nome}</div>
                         {c.fantasia && (
                           <div className="text-[11.5px] text-[#9AA8A2]">{c.fantasia}</div>
+                        )}
+                        {c.status === "alterado" && c.alteracoes && c.alteracoes.length > 0 && (
+                          <div className="mt-1 flex flex-col gap-0.5">
+                            {c.alteracoes.map((a, j) => (
+                              <div key={j} className="text-[11.5px] text-[#7A8A84]">
+                                <span className="font-semibold text-[#C98A0E]">
+                                  {ROTULO_CAMPO[a.campo] || a.campo}:
+                                </span>{" "}
+                                <span className="line-through text-[#B0BBB6]">{a.de || "—"}</span>{" "}
+                                → <span className="text-ink">{a.para}</span>
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </td>
                       <td className="px-3 py-2 font-mono text-[#34433D]">{c.doc || "—"}</td>

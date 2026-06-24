@@ -14,7 +14,7 @@ class ClienteController {
     this.importar = this.importar.bind(this);
   }
 
-  /** Lê um TXT (fixed-width) e devolve os clientes extraídos, sem gravar. */
+  /** Lê um TXT, e compara com o cadastro existente marcando Novo/Alterado/Igual. */
   public async importarPreview(req: Request, res: Response) {
     try {
       if (!req.file) {
@@ -22,14 +22,35 @@ class ClienteController {
         return;
       }
       const resultado = parseClientesTxt(req.file.buffer);
-      res.json(resultado);
+      const { porCodigo, porDoc } = await carregarIndices();
+
+      let novos = 0;
+      let alterados = 0;
+      let iguais = 0;
+
+      const clientes = resultado.clientes.map((c) => {
+        const existente = acharExistente(c, porCodigo, porDoc);
+        if (!existente) {
+          novos++;
+          return { ...c, status: "novo" as const, alteracoes: [] };
+        }
+        const { alteracoes } = diffCliente(existente, c);
+        if (alteracoes.length) {
+          alterados++;
+          return { ...c, status: "alterado" as const, alteracoes };
+        }
+        iguais++;
+        return { ...c, status: "igual" as const, alteracoes: [] };
+      });
+
+      res.json({ ...resultado, clientes, resumo: { novos, alterados, iguais } });
     } catch (err) {
       console.error("Erro ao ler TXT de clientes:", err);
       res.status(500).json({ errors: ["Erro ao interpretar o arquivo."] });
     }
   }
 
-  /** Grava no cadastro os clientes confirmados (vindos do preview). */
+  /** Aplica a importação: insere novos e atualiza os alterados (casados por código/doc). */
   public async importar(req: Request, res: Response) {
     try {
       const repo = AppDataSource.getRepository(Cliente);
@@ -40,8 +61,17 @@ class ClienteController {
         return;
       }
 
+      const { porCodigo, porDoc } = await carregarIndices();
+
       let inseridos = 0;
+      let atualizados = 0;
+      let inalterados = 0;
       let ignorados = 0;
+      const mudancas: Array<{
+        codigo: string;
+        nome: string;
+        alteracoes: Array<{ campo: string; de: string; para: string }>;
+      }> = [];
 
       for (const c of clientes) {
         const nome = (c.nome || "").trim();
@@ -51,32 +81,63 @@ class ClienteController {
         }
         const doc = String(c.doc || "").replace(/\D/g, "");
         const tipo = doc.length === 11 ? "PF" : "PJ";
+        const existente = acharExistente(c, porCodigo, porDoc);
 
-        // Dedup: por documento (se houver) ou por nome + cidade.
-        const existe = doc
-          ? await repo.findOne({ where: { doc } })
-          : await repo.findOne({ where: { nome, municipio: c.cidade || undefined } });
-        if (existe) {
-          ignorados++;
+        if (!existente) {
+          await repo.save(
+            repo.create({
+              codigo_externo: c.codigo || undefined,
+              nome,
+              nome_fantasia: c.fantasia || undefined,
+              doc,
+              telefone: c.telefone || undefined,
+              email: c.email || undefined,
+              inscricao_municipal: c.inscricao_municipal || undefined,
+              inscricao_estadual: c.inscricao_estadual || undefined,
+              cnae: c.cnae || undefined,
+              contador: c.contador || undefined,
+              responsavel_legal: c.responsavel_legal || undefined,
+              natureza_juridica: c.natureza_juridica || undefined,
+              capital_social: c.capital_social || undefined,
+              tipo,
+              endereco: c.endereco || undefined,
+              numero: c.numero || undefined,
+              complemento: c.complemento || undefined,
+              bairro: c.bairro || undefined,
+              municipio: c.cidade || undefined,
+              uf: c.uf || undefined,
+              cep: c.cep || undefined,
+            })
+          );
+          inseridos++;
           continue;
         }
-        await repo.save(
-          repo.create({
-            nome,
-            nome_fantasia: c.fantasia || undefined,
-            doc,
-            telefone: c.telefone || undefined,
-            tipo,
-            endereco: c.endereco || undefined,
-            municipio: c.cidade || undefined,
-            uf: c.uf || undefined,
-            cep: c.cep || undefined,
-          })
-        );
-        inseridos++;
+
+        const { alteracoes, patch } = diffCliente(existente, c);
+        // Vincula o código de origem se ainda não tiver.
+        if (c.codigo && !existente.codigo_externo) patch.codigo_externo = String(c.codigo);
+
+        if (alteracoes.length || patch.codigo_externo) {
+          repo.merge(existente, patch);
+          await repo.save(existente);
+        }
+
+        if (alteracoes.length) {
+          atualizados++;
+          mudancas.push({ codigo: String(c.codigo || ""), nome, alteracoes });
+        } else {
+          inalterados++;
+        }
       }
 
-      res.status(201).json({ inseridos, ignorados, total: clientes.length });
+      res.status(201).json({
+        inseridos,
+        atualizados,
+        inalterados,
+        ignorados,
+        total: clientes.length,
+        mudancas,
+      });
     } catch (err) {
       console.error("Erro ao importar clientes:", err);
       res.status(500).json({ errors: ["Erro ao importar clientes."] });
@@ -156,6 +217,84 @@ class ClienteController {
       res.status(500).json({ errors: ["Erro ao remover cliente."] });
     }
   }
+}
+
+/* --------------------------- helpers de import --------------------------- */
+
+const soDigitos = (s: any) => String(s ?? "").replace(/\D/g, "");
+
+/** Carrega o cadastro atual em índices por código de origem e por documento. */
+async function carregarIndices() {
+  const repo = AppDataSource.getRepository(Cliente);
+  const todos = await repo.find();
+  const porCodigo = new Map<string, Cliente>();
+  const porDoc = new Map<string, Cliente>();
+  for (const c of todos) {
+    if (c.codigo_externo) porCodigo.set(String(c.codigo_externo).trim(), c);
+    const d = soDigitos(c.doc);
+    if (d) porDoc.set(d, c);
+  }
+  return { porCodigo, porDoc };
+}
+
+/** Acha o cliente existente: primeiro pelo código de origem, depois pelo documento. */
+function acharExistente(
+  novo: any,
+  porCodigo: Map<string, Cliente>,
+  porDoc: Map<string, Cliente>
+): Cliente | null {
+  const cod = String(novo.codigo ?? "").trim();
+  if (cod && porCodigo.has(cod)) return porCodigo.get(cod)!;
+  const doc = soDigitos(novo.doc);
+  if (doc && porDoc.has(doc)) return porDoc.get(doc)!;
+  return null;
+}
+
+// Mapa campo-do-import -> coluna-do-cadastro.
+const CAMPOS_DIFF: Array<[string, keyof Cliente]> = [
+  ["nome", "nome"],
+  ["fantasia", "nome_fantasia"],
+  ["doc", "doc"],
+  ["telefone", "telefone"],
+  ["email", "email"],
+  ["inscricao_municipal", "inscricao_municipal"],
+  ["inscricao_estadual", "inscricao_estadual"],
+  ["cnae", "cnae"],
+  ["contador", "contador"],
+  ["responsavel_legal", "responsavel_legal"],
+  ["natureza_juridica", "natureza_juridica"],
+  ["capital_social", "capital_social"],
+  ["endereco", "endereco"],
+  ["numero", "numero"],
+  ["complemento", "complemento"],
+  ["bairro", "bairro"],
+  ["cidade", "municipio"],
+  ["uf", "uf"],
+  ["cep", "cep"],
+];
+
+/**
+ * Compara o cliente do import com o existente.
+ * Só considera campos que o import realmente trouxe (não apaga dado existente com vazio).
+ * Documento é comparado por dígitos (ignora máscara).
+ */
+function diffCliente(existente: Cliente, novo: any) {
+  const alteracoes: Array<{ campo: string; de: string; para: string }> = [];
+  const patch: any = {};
+  for (const [src, col] of CAMPOS_DIFF) {
+    let val = String(novo[src] ?? "").trim();
+    if (!val) continue; // import não forneceu => mantém o que já existe
+    let atual = String((existente as any)[col] ?? "").trim();
+    if (col === "doc") {
+      val = soDigitos(val);
+      atual = soDigitos(atual);
+    }
+    if (val !== atual) {
+      alteracoes.push({ campo: String(col), de: atual, para: val });
+      patch[col] = val;
+    }
+  }
+  return { alteracoes, patch };
 }
 
 export default new ClienteController();

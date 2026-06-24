@@ -19,15 +19,26 @@ export interface Usuario {
 
 export interface Cliente {
   id?: number;
+  codigo_externo?: string;
   nome: string;
+  nome_fantasia?: string;
   doc: string;
   tipo: TipoPessoa;
+  telefone?: string;
   email?: string;
   inscricao_municipal?: string;
+  inscricao_estadual?: string;
+  cnae?: string;
+  contador?: string;
+  responsavel_legal?: string;
+  natureza_juridica?: string;
+  capital_social?: string;
   endereco?: string;
   numero?: string;
+  complemento?: string;
   bairro?: string;
   municipio?: string;
+  uf?: string;
   cep?: string;
 }
 

@@ -23,6 +23,10 @@ export const Clientes = () => {
   const pj = clientes.filter((c) => c.tipo === "PJ").length;
   const pf = clientes.filter((c) => c.tipo === "PF").length;
 
+  function setM<K extends keyof Cliente>(campo: K, valor: any) {
+    setModal((m) => (m ? { ...m, [campo]: valor } : m));
+  }
+
   async function salvar() {
     if (!modal) return;
     try {
@@ -137,8 +141,8 @@ export const Clientes = () => {
       {/* Modal criar/editar */}
       {modal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-[560px]">
-            <div className="flex items-center justify-between mb-5">
+          <div className="bg-white rounded-2xl w-full max-w-[760px] max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-6 pb-4 border-b border-[#EEF2F0]">
               <h3 className="font-sora text-lg font-bold m-0">
                 {modal.id ? "Editar cliente" : "Novo cliente"}
               </h3>
@@ -146,26 +150,65 @@ export const Clientes = () => {
                 <FiX size={20} />
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <Field className="col-span-2" label="Nome / Razão social" value={modal.nome} onChange={(v) => setModal({ ...modal, nome: v })} />
-              <Field label="CPF / CNPJ" value={modal.doc} onChange={(v) => setModal({ ...modal, doc: v })} mono />
-              <div>
-                <label className="block text-[12.5px] font-semibold text-[#5A6A63] mb-1.5">Tipo</label>
-                <select
-                  value={modal.tipo}
-                  onChange={(e) => setModal({ ...modal, tipo: e.target.value as any })}
-                  className="w-full h-[42px] border-[1.5px] border-[#E2E8E6] rounded-[10px] px-3 text-[13.5px] bg-white outline-none focus:border-brand"
-                >
-                  <option value="PJ">Pessoa Jurídica</option>
-                  <option value="PF">Pessoa Física</option>
-                </select>
-              </div>
-              <Field className="col-span-2" label="E-mail" value={modal.email || ""} onChange={(v) => setModal({ ...modal, email: v })} />
-              <Field label="Município" value={modal.municipio || ""} onChange={(v) => setModal({ ...modal, municipio: v })} />
-              <Field label="CEP" value={modal.cep || ""} onChange={(v) => setModal({ ...modal, cep: v })} mono />
-              <Field className="col-span-2" label="Endereço" value={modal.endereco || ""} onChange={(v) => setModal({ ...modal, endereco: v })} />
+
+            <div className="scrl overflow-y-auto px-6 py-5 flex flex-col gap-5">
+              {/* Identificação */}
+              <Secao titulo="Identificação">
+                <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
+                  <Field className="sm:col-span-1" label="Código" value={modal.codigo_externo || ""} onChange={(v) => setM("codigo_externo", v)} mono />
+                  <Field className="sm:col-span-3" label="Nome / Razão social" value={modal.nome} onChange={(v) => setM("nome", v)} />
+                  <Field className="sm:col-span-2" label="Nome fantasia" value={modal.nome_fantasia || ""} onChange={(v) => setM("nome_fantasia", v)} />
+                  <Field className="sm:col-span-2" label="CPF / CNPJ" value={modal.doc} onChange={(v) => setM("doc", v)} mono />
+                  <div className="sm:col-span-2">
+                    <label className="block text-[12.5px] font-semibold text-[#5A6A63] mb-1.5">Tipo</label>
+                    <select
+                      value={modal.tipo}
+                      onChange={(e) => setM("tipo", e.target.value)}
+                      className="w-full h-[42px] border-[1.5px] border-[#E2E8E6] rounded-[10px] px-3 text-[13.5px] bg-white outline-none focus:border-brand"
+                    >
+                      <option value="PJ">Pessoa Jurídica</option>
+                      <option value="PF">Pessoa Física</option>
+                    </select>
+                  </div>
+                  <Field className="sm:col-span-2" label="Natureza jurídica" value={modal.natureza_juridica || ""} onChange={(v) => setM("natureza_juridica", v)} />
+                </div>
+              </Secao>
+
+              {/* Contato */}
+              <Secao titulo="Contato">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="E-mail" value={modal.email || ""} onChange={(v) => setM("email", v)} />
+                  <Field label="Telefone" value={modal.telefone || ""} onChange={(v) => setM("telefone", v)} mono />
+                </div>
+              </Secao>
+
+              {/* Endereço */}
+              <Secao titulo="Endereço">
+                <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
+                  <Field className="sm:col-span-4" label="Endereço" value={modal.endereco || ""} onChange={(v) => setM("endereco", v)} />
+                  <Field className="sm:col-span-1" label="Número" value={modal.numero || ""} onChange={(v) => setM("numero", v)} mono />
+                  <Field className="sm:col-span-1" label="CEP" value={modal.cep || ""} onChange={(v) => setM("cep", v)} mono />
+                  <Field className="sm:col-span-2" label="Complemento" value={modal.complemento || ""} onChange={(v) => setM("complemento", v)} />
+                  <Field className="sm:col-span-2" label="Bairro" value={modal.bairro || ""} onChange={(v) => setM("bairro", v)} />
+                  <Field className="sm:col-span-1" label="Município" value={modal.municipio || ""} onChange={(v) => setM("municipio", v)} />
+                  <Field className="sm:col-span-1" label="UF" value={modal.uf || ""} onChange={(v) => setM("uf", v.toUpperCase().slice(0, 2))} mono />
+                </div>
+              </Secao>
+
+              {/* Dados fiscais */}
+              <Secao titulo="Dados fiscais">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <Field label="Insc. municipal" value={modal.inscricao_municipal || ""} onChange={(v) => setM("inscricao_municipal", v)} mono />
+                  <Field label="Insc. estadual" value={modal.inscricao_estadual || ""} onChange={(v) => setM("inscricao_estadual", v)} mono />
+                  <Field label="CNAE" value={modal.cnae || ""} onChange={(v) => setM("cnae", v)} mono />
+                  <Field label="Capital social" value={modal.capital_social || ""} onChange={(v) => setM("capital_social", v)} mono />
+                  <Field label="Contador" value={modal.contador || ""} onChange={(v) => setM("contador", v)} />
+                  <Field label="Responsável legal" value={modal.responsavel_legal || ""} onChange={(v) => setM("responsavel_legal", v)} />
+                </div>
+              </Secao>
             </div>
-            <div className="flex justify-end gap-3 mt-6">
+
+            <div className="flex justify-end gap-3 p-6 pt-4 border-t border-[#EEF2F0]">
               <button
                 onClick={() => setModal(null)}
                 className="h-11 px-5 rounded-xl border-[1.5px] border-[#E2E8E6] bg-white text-sm font-semibold text-[#34433D] hover:border-brand"
@@ -188,3 +231,14 @@ export const Clientes = () => {
     </div>
   );
 };
+
+function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-[11px] font-bold tracking-[0.08em] uppercase text-[#9AA8A2] mb-3">
+        {titulo}
+      </div>
+      {children}
+    </div>
+  );
+}
