@@ -16,8 +16,14 @@ export class Cliente {
   @Column({ type: "varchar", length: 180 })
   nome?: string;
 
+  @Column({ type: "varchar", length: 180, nullable: true })
+  nome_fantasia?: string;
+
   @Column({ type: "varchar", length: 18 })
   doc?: string; // CPF ou CNPJ
+
+  @Column({ type: "varchar", length: 20, nullable: true })
+  telefone?: string;
 
   @Column({ type: "varchar", length: 2, default: "PJ" })
   tipo?: TipoPessoa;

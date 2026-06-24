@@ -54,7 +54,6 @@ function App() {
           <Route path="/configuracoes" element={<Configuracoes />} />
           <Route path="/historico" element={<Historico />} />
           <Route path="/documento/:id" element={<Preview />} />
-          <Route path="/documento" element={<Preview />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

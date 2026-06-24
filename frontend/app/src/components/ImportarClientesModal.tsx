@@ -6,6 +6,9 @@ import { PrimaryButton } from "./ui";
 interface ClienteLido {
   codigo: string;
   nome: string;
+  fantasia: string;
+  doc: string;
+  telefone: string;
   endereco: string;
   cidade: string;
   uf: string;
@@ -16,6 +19,7 @@ interface Preview {
   total_declarado: number | null;
   total_lido: number;
   encoding: string;
+  formato: "tab" | "colunas";
   avisos: string[];
 }
 
@@ -154,23 +158,28 @@ export function ImportarClientesModal({
               <table className="w-full text-[13px] border-collapse">
                 <thead className="sticky top-0 bg-[#F4F7F6]">
                   <tr className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#9AA8A2]">
-                    <th className="text-left px-3 py-2.5 w-[60px]">Cód.</th>
+                    <th className="text-left px-3 py-2.5 w-[52px]">Cód.</th>
                     <th className="text-left px-3 py-2.5">Nome</th>
-                    <th className="text-left px-3 py-2.5">Endereço</th>
+                    <th className="text-left px-3 py-2.5 w-[150px]">CNPJ / CPF</th>
+                    <th className="text-left px-3 py-2.5 w-[120px]">Telefone</th>
                     <th className="text-left px-3 py-2.5">Cidade</th>
-                    <th className="text-left px-3 py-2.5 w-[60px]">UF</th>
-                    <th className="text-left px-3 py-2.5 w-[110px]">CEP</th>
+                    <th className="text-left px-3 py-2.5 w-[50px]">UF</th>
                   </tr>
                 </thead>
                 <tbody>
                   {preview.clientes.map((c, i) => (
                     <tr key={i} className="border-t border-[#F2F5F4]">
                       <td className="px-3 py-2 font-mono text-[#5A6A63]">{c.codigo}</td>
-                      <td className="px-3 py-2 font-semibold text-ink">{c.nome}</td>
-                      <td className="px-3 py-2 text-[#5A6A63]">{c.endereco || "—"}</td>
-                      <td className="px-3 py-2 text-[#34433D]">{c.cidade}</td>
-                      <td className="px-3 py-2 font-mono text-[#34433D]">{c.uf}</td>
-                      <td className="px-3 py-2 font-mono text-[#34433D]">{c.cep || "—"}</td>
+                      <td className="px-3 py-2">
+                        <div className="font-semibold text-ink">{c.nome}</div>
+                        {c.fantasia && (
+                          <div className="text-[11.5px] text-[#9AA8A2]">{c.fantasia}</div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-[#34433D]">{c.doc || "—"}</td>
+                      <td className="px-3 py-2 font-mono text-[#34433D]">{c.telefone || "—"}</td>
+                      <td className="px-3 py-2 text-[#34433D]">{c.cidade || "—"}</td>
+                      <td className="px-3 py-2 font-mono text-[#34433D]">{c.uf || "—"}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useReactToPrint } from "react-to-print";
-import { FiPrinter, FiMail, FiDownload } from "react-icons/fi";
+import { FiPrinter, FiDownload } from "react-icons/fi";
 import api from "../../api/api";
 import { Documento } from "../../types";
 import { fmtBRL } from "../../utils/format";
@@ -43,9 +43,6 @@ export const Preview = () => {
           className="h-10 px-4 rounded-[11px] border border-[#E2E8E6] bg-white text-[#34433D] text-[13.5px] font-semibold flex items-center gap-2 hover:border-brand"
         >
           <FiPrinter size={16} /> Imprimir
-        </button>
-        <button className="h-10 px-4 rounded-[11px] border border-[#E2E8E6] bg-white text-[#34433D] text-[13.5px] font-semibold flex items-center gap-2 hover:border-brand">
-          <FiMail size={16} /> Enviar e-mail
         </button>
         <button
           onClick={print}

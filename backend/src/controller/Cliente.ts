@@ -49,10 +49,13 @@ class ClienteController {
           ignorados++;
           continue;
         }
-        // Dedup leve por nome + cidade (evita duplicar reimportações).
-        const existe = await repo.findOne({
-          where: { nome, municipio: c.cidade || undefined },
-        });
+        const doc = String(c.doc || "").replace(/\D/g, "");
+        const tipo = doc.length === 11 ? "PF" : "PJ";
+
+        // Dedup: por documento (se houver) ou por nome + cidade.
+        const existe = doc
+          ? await repo.findOne({ where: { doc } })
+          : await repo.findOne({ where: { nome, municipio: c.cidade || undefined } });
         if (existe) {
           ignorados++;
           continue;
@@ -60,8 +63,10 @@ class ClienteController {
         await repo.save(
           repo.create({
             nome,
-            doc: c.doc || "",
-            tipo: "PJ",
+            nome_fantasia: c.fantasia || undefined,
+            doc,
+            telefone: c.telefone || undefined,
+            tipo,
             endereco: c.endereco || undefined,
             municipio: c.cidade || undefined,
             uf: c.uf || undefined,

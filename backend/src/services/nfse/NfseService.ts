@@ -10,6 +10,7 @@ import {
   PRESTADOR,
   WS_CREDENCIAIS,
 } from "../../config/nfse";
+import { codigoIbge } from "../../utils/municipios";
 import { NfseXmlFactory, DadosRps } from "./NfseXmlFactory";
 import { FiorilliProvider } from "./FiorilliProvider";
 
@@ -86,10 +87,19 @@ class NfseService {
     const numeroRps = dados.numeroRps ?? ++sequencialRps;
     const uuidLanc = uuidv4().replace(/-/g, "").slice(0, 20);
     const t = dados.tomador;
-    // O XML exige código IBGE do município; se vier nome de cidade, usa o do prestador.
-    const tomadorCodMun = /^\d+$/.test(t.municipio || "")
-      ? (t.municipio as string)
-      : PRESTADOR.codigoMunicipio;
+    // O XML exige o código IBGE do município. Se já vier numérico, usa direto;
+    // senão resolve a partir do nome da cidade + UF; senão cai no do prestador.
+    let tomadorCodMun: string;
+    let avisoMunicipio = "";
+    if (/^\d+$/.test(t.municipio || "")) {
+      tomadorCodMun = t.municipio as string;
+    } else {
+      const cod = codigoIbge(t.municipio, t.uf);
+      tomadorCodMun = cod || PRESTADOR.codigoMunicipio;
+      if (!cod && t.municipio) {
+        avisoMunicipio = `Município "${t.municipio}/${t.uf || "?"}" não encontrado na base do IBGE; foi usado o código do prestador. Confira o cadastro do cliente.`;
+      }
+    }
 
     const dadosRps: DadosRps = {
       uuidLanc,
@@ -135,13 +145,16 @@ class NfseService {
       enviado: false,
     };
 
+    if (avisoMunicipio) base.aviso = avisoMunicipio;
+
     const senha = dados.certPassword || CERT_PASSWORD;
 
     // Sem certificado ou sem senha: devolve o RPS montado, pronto para envio.
     if (!this.certificadoConfigurado() || !senha) {
-      base.aviso = !this.certificadoConfigurado()
+      const certMsg = !this.certificadoConfigurado()
         ? "Certificado A1 não encontrado. Faça o upload em /api/nfse/certificado para transmitir ao webservice."
         : "Senha do certificado não configurada (NFSE_CERT_PASSWORD). RPS montado, mas não transmitido.";
+      base.aviso = [avisoMunicipio, certMsg].filter(Boolean).join(" ");
       return base;
     }
 

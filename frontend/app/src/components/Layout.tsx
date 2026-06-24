@@ -6,9 +6,6 @@ import {
   FiLayers,
   FiUsers,
   FiClock,
-  FiEye,
-  FiSearch,
-  FiBell,
   FiLogOut,
   FiUserCheck,
   FiSettings,
@@ -59,7 +56,6 @@ const NAV = [
     { to: "/clientes", label: "Clientes", icon: FiUsers },
     { to: "/usuarios", label: "Usuários", icon: FiUserCheck },
     { to: "/historico", label: "Histórico", icon: FiClock },
-    { to: "/documento", label: "Documentos", icon: FiEye },
   ]},
   { secao: "Sistema", itens: [
     { to: "/configuracoes", label: "Configurações", icon: FiSettings },
@@ -141,26 +137,11 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
 
       {/* MAIN */}
       <main className="scrl flex-1 min-w-0 h-screen overflow-y-auto">
-        <div className="sticky top-0 z-[5] bg-cloud/85 backdrop-blur border-b border-[#E7ECEA] px-9 py-5 flex items-center justify-between">
-          <div>
-            <h1 className="font-sora text-[22px] font-bold tracking-tight m-0">
-              {head.title}
-            </h1>
-            <div className="text-[#7A8A84] text-[13.5px] mt-0.5">{head.subtitle}</div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <FiSearch className="absolute left-3.5 top-3 text-[#9AA8A2]" size={17} />
-              <input
-                placeholder="Buscar cliente, nº da nota..."
-                className="w-[262px] h-10 border border-[#E2E8E6] rounded-[11px] pl-[38px] pr-3.5 text-[13.5px] bg-white outline-none focus:border-brand"
-              />
-            </div>
-            <button className="w-10 h-10 rounded-[11px] border border-[#E2E8E6] bg-white flex items-center justify-center relative">
-              <FiBell size={18} className="text-[#34433D]" />
-              <span className="absolute top-[9px] right-[10px] w-[7px] h-[7px] rounded-full bg-brand border-[1.5px] border-white" />
-            </button>
-          </div>
+        <div className="sticky top-0 z-[5] bg-cloud/85 backdrop-blur border-b border-[#E7ECEA] px-9 py-5">
+          <h1 className="font-sora text-[22px] font-bold tracking-tight m-0">
+            {head.title}
+          </h1>
+          <div className="text-[#7A8A84] text-[13.5px] mt-0.5">{head.subtitle}</div>
         </div>
 
         {children}

@@ -1,9 +1,0 @@
-A EXEMPLO LTDA                          Clientes(Reduzido)                  Emissão: 21/09/2021         Página: 01
-o Nome                                  Endereço                            Cidade               Estado    CEP
-1 CLIENTE EXEMPLO 1                                                         CRICIUMA             SC
-2 CLIENTE EXEMPLO 2                                                         RIO DE JANEIRO       RJ
-3 CLIENTE EXEMPLO 3                                                         CURITIBA             PR
-4 CLIENTE EXEMPLO 4                                                         AGRONOMICA           SC
-5 CLIENTE EXEMPLO 5                                                         OURINHOS             SP
-
-    Clientes cadastrados:      005
