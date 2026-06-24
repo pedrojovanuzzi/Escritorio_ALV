@@ -1,20 +1,55 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiEye } from "react-icons/fi";
+import { FiEye, FiX } from "react-icons/fi";
 import api from "../../api/api";
 import { Documento, Estatisticas } from "../../types";
 import { fmtBRL } from "../../utils/format";
 import { StatusBadge } from "../../components/ui";
+
+const STATUS_OPCOES = [
+  "Autorizada",
+  "Em aberto",
+  "Pago",
+  "Vencido",
+  "Cancelada",
+  "Rascunho",
+];
 
 export const Historico = () => {
   const navigate = useNavigate();
   const [docs, setDocs] = useState<Documento[]>([]);
   const [stats, setStats] = useState<Estatisticas | null>(null);
 
+  // filtros
+  const [tipo, setTipo] = useState("");
+  const [status, setStatus] = useState("");
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
+
+  const temFiltro = !!(tipo || status || dataInicio || dataFim);
+
   useEffect(() => {
-    api.get("/documentos").then((r) => setDocs(r.data)).catch(() => {});
+    const params: Record<string, string> = {};
+    if (tipo) params.tipo = tipo;
+    if (status) params.status = status;
+    if (dataInicio) params.data_inicio = dataInicio;
+    if (dataFim) params.data_fim = dataFim;
+    api
+      .get("/documentos", { params })
+      .then((r) => setDocs(r.data))
+      .catch(() => {});
+  }, [tipo, status, dataInicio, dataFim]);
+
+  useEffect(() => {
     api.get("/documentos/estatisticas").then((r) => setStats(r.data)).catch(() => {});
   }, []);
+
+  function limparFiltros() {
+    setTipo("");
+    setStatus("");
+    setDataInicio("");
+    setDataFim("");
+  }
 
   const cards = [
     { label: "NFS-e emitidas", valor: String(stats?.nfse_emitidas ?? 0), sub: "total" },
@@ -43,6 +78,67 @@ export const Historico = () => {
             <div className="text-xs text-[#7A8A84] font-semibold mt-0.5">{c.sub}</div>
           </div>
         ))}
+      </div>
+
+      {/* Barra de filtros */}
+      <div className="bg-white border border-[#E7ECEA] rounded-2xl px-5 py-4 mb-4 flex flex-wrap items-end gap-4">
+        <FiltroCampo label="Data início">
+          <input
+            type="date"
+            value={dataInicio}
+            max={dataFim || undefined}
+            onChange={(e) => setDataInicio(e.target.value)}
+            className="h-[42px] border-[1.5px] border-[#E2E8E6] rounded-[10px] px-3 text-[13.5px] outline-none focus:border-brand"
+          />
+        </FiltroCampo>
+        <FiltroCampo label="Data fim">
+          <input
+            type="date"
+            value={dataFim}
+            min={dataInicio || undefined}
+            onChange={(e) => setDataFim(e.target.value)}
+            className="h-[42px] border-[1.5px] border-[#E2E8E6] rounded-[10px] px-3 text-[13.5px] outline-none focus:border-brand"
+          />
+        </FiltroCampo>
+        <FiltroCampo label="Tipo">
+          <select
+            value={tipo}
+            onChange={(e) => setTipo(e.target.value)}
+            className="h-[42px] min-w-[150px] border-[1.5px] border-[#E2E8E6] rounded-[10px] px-3 text-[13.5px] bg-white outline-none focus:border-brand"
+          >
+            <option value="">Todos</option>
+            <option value="NFSE">NFS-e</option>
+            <option value="BOLETO">Boleto</option>
+          </select>
+        </FiltroCampo>
+        <FiltroCampo label="Status">
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="h-[42px] min-w-[160px] border-[1.5px] border-[#E2E8E6] rounded-[10px] px-3 text-[13.5px] bg-white outline-none focus:border-brand"
+          >
+            <option value="">Todos</option>
+            {STATUS_OPCOES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </FiltroCampo>
+
+        <div className="ml-auto flex items-center gap-3">
+          <span className="text-[12.5px] text-[#7A8A84]">
+            {docs.length} resultado(s)
+          </span>
+          {temFiltro && (
+            <button
+              onClick={limparFiltros}
+              className="flex items-center gap-1.5 h-[38px] px-3.5 rounded-[10px] border-[1.5px] border-[#E2E8E6] bg-white text-[13px] font-semibold text-[#34433D] hover:border-brand hover:text-brand-dark"
+            >
+              <FiX size={15} /> Limpar filtros
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="bg-white border border-[#E7ECEA] rounded-2xl overflow-hidden">
@@ -86,10 +182,29 @@ export const Historico = () => {
         ))}
         {docs.length === 0 && (
           <div className="px-[22px] py-10 text-center text-[#9AA8A2] text-sm">
-            Nenhum documento emitido ainda. Gere uma NFS-e ou boleto para começar.
+            {temFiltro
+              ? "Nenhum documento encontrado para os filtros selecionados."
+              : "Nenhum documento emitido ainda. Gere uma NFS-e ou boleto para começar."}
           </div>
         )}
       </div>
     </div>
   );
 };
+
+function FiltroCampo({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col">
+      <label className="text-[12px] font-semibold text-[#5A6A63] mb-1.5">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}

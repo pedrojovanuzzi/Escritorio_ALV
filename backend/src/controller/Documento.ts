@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { Between, MoreThanOrEqual, LessThanOrEqual } from "typeorm";
 import AppDataSource from "../database/DataSource";
 import { Documento } from "../entities/Documento";
 import NfseService from "../services/nfse/NfseService";
@@ -14,12 +15,31 @@ class DocumentoController {
     this.estatisticas = this.estatisticas.bind(this);
   }
 
-  /** Histórico de documentos. */
+  /**
+   * Histórico de documentos com filtros opcionais:
+   * - tipo: NFSE | BOLETO
+   * - status: Autorizada | Em aberto | Pago | Vencido | Cancelada | Rascunho
+   * - data_inicio / data_fim (YYYY-MM-DD) sobre a data de criação
+   */
   public async listar(req: Request, res: Response) {
     try {
       const repo = AppDataSource.getRepository(Documento);
-      const { tipo } = req.query;
-      const where = tipo ? { tipo: tipo as any } : {};
+      const { tipo, status, data_inicio, data_fim } = req.query as Record<
+        string,
+        string
+      >;
+
+      const where: any = {};
+      if (tipo) where.tipo = tipo;
+      if (status) where.status = status;
+
+      // Filtro por período (data de criação).
+      const inicio = data_inicio ? new Date(`${data_inicio}T00:00:00`) : null;
+      const fim = data_fim ? new Date(`${data_fim}T23:59:59.999`) : null;
+      if (inicio && fim) where.criado_em = Between(inicio, fim);
+      else if (inicio) where.criado_em = MoreThanOrEqual(inicio);
+      else if (fim) where.criado_em = LessThanOrEqual(fim);
+
       const docs = await repo.find({ where, order: { criado_em: "DESC" } });
       res.json(docs);
     } catch (err) {
