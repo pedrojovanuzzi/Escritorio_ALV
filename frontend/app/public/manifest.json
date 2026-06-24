@@ -1,0 +1,15 @@
+{
+  "short_name": "Alvorada Fiscal",
+  "name": "Sistema Fiscal Alvorada",
+  "icons": [
+    {
+      "src": "logo.png",
+      "type": "image/png",
+      "sizes": "150x150"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#0A1613",
+  "background_color": "#F4F7F6"
+}

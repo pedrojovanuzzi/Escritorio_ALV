@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Manrope", sans-serif;
+  color: #122019;
+  background: #f4f7f6;
+  -webkit-font-smoothing: antialiased;
+}
+
+::placeholder {
+  color: #a9b6b1;
+}
+
+.scrl::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.scrl::-webkit-scrollbar-thumb {
+  background: #d6dedb;
+  border-radius: 8px;
+  border: 2px solid #f4f7f6;
+}
