@@ -88,8 +88,8 @@ export const EmissaoLote = () => {
             <Stat valor="0" label="com erro" />
           </div>
           <div className="flex gap-3 justify-center">
-            <PrimaryButton onClick={() => navigate("/historico")} className="px-6">
-              Ver no histórico
+            <PrimaryButton onClick={() => navigate(tipo === "NFSE" ? "/notas" : "/boletos")} className="px-6">
+              {tipo === "NFSE" ? "Ver notas geradas" : "Ver boletos gerados"}
             </PrimaryButton>
             <button
               onClick={() => setResultado(null)}

@@ -24,7 +24,7 @@ export const AuthPage = () => {
     try {
       const res = await api.post("/auth/login", { email, password });
       loginIn({ ...res.data.user, token: res.data.token });
-      navigate("/historico");
+      navigate("/notas");
     } catch (err: any) {
       setError(
         err?.response?.data?.errors?.[0] || "Não foi possível entrar. Tente novamente."

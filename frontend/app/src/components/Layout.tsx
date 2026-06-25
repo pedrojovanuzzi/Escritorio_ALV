@@ -5,7 +5,6 @@ import {
   FiCreditCard,
   FiLayers,
   FiUsers,
-  FiClock,
   FiLogOut,
   FiUserCheck,
   FiSettings,
@@ -36,9 +35,13 @@ const TITULOS: Record<string, { title: string; subtitle: string }> = {
     title: "Configurações",
     subtitle: "Padrões de emissão de NFS-e e boletos",
   },
-  "/historico": {
-    title: "Histórico de documentos",
-    subtitle: "Documentos emitidos",
+  "/notas": {
+    title: "Notas Geradas",
+    subtitle: "NFS-e emitidas",
+  },
+  "/boletos": {
+    title: "Boletos Gerados",
+    subtitle: "Boletos emitidos",
   },
   "/documento": {
     title: "Visualização do documento",
@@ -55,7 +58,8 @@ const NAV = [
   { secao: "Gerenciar", itens: [
     { to: "/clientes", label: "Clientes", icon: FiUsers },
     { to: "/usuarios", label: "Usuários", icon: FiUserCheck },
-    { to: "/historico", label: "Histórico", icon: FiClock },
+    { to: "/notas", label: "Notas Geradas", icon: FiFileText },
+    { to: "/boletos", label: "Boletos Gerados", icon: FiCreditCard },
   ]},
   { secao: "Sistema", itens: [
     { to: "/configuracoes", label: "Configurações", icon: FiSettings },

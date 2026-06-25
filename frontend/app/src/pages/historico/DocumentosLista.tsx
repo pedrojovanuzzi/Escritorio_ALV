@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiEye, FiX } from "react-icons/fi";
 import api from "../../api/api";
-import { Documento, Estatisticas } from "../../types";
+import { Documento, Estatisticas, TipoDocumento } from "../../types";
 import { fmtBRL } from "../../utils/format";
 import { StatusBadge } from "../../components/ui";
 
@@ -15,22 +15,20 @@ const STATUS_OPCOES = [
   "Rascunho",
 ];
 
-export const Historico = () => {
+export const DocumentosLista = ({ tipoFixo }: { tipoFixo: TipoDocumento }) => {
   const navigate = useNavigate();
   const [docs, setDocs] = useState<Documento[]>([]);
   const [stats, setStats] = useState<Estatisticas | null>(null);
 
   // filtros
-  const [tipo, setTipo] = useState("");
   const [status, setStatus] = useState("");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
 
-  const temFiltro = !!(tipo || status || dataInicio || dataFim);
+  const temFiltro = !!(status || dataInicio || dataFim);
 
   useEffect(() => {
-    const params: Record<string, string> = {};
-    if (tipo) params.tipo = tipo;
+    const params: Record<string, string> = { tipo: tipoFixo };
     if (status) params.status = status;
     if (dataInicio) params.data_inicio = dataInicio;
     if (dataFim) params.data_fim = dataFim;
@@ -38,30 +36,33 @@ export const Historico = () => {
       .get("/documentos", { params })
       .then((r) => setDocs(r.data))
       .catch(() => {});
-  }, [tipo, status, dataInicio, dataFim]);
+  }, [tipoFixo, status, dataInicio, dataFim]);
 
   useEffect(() => {
     api.get("/documentos/estatisticas").then((r) => setStats(r.data)).catch(() => {});
   }, []);
 
   function limparFiltros() {
-    setTipo("");
     setStatus("");
     setDataInicio("");
     setDataFim("");
   }
 
-  const cards = [
-    { label: "NFS-e emitidas", valor: String(stats?.nfse_emitidas ?? 0), sub: "total" },
-    { label: "Boletos gerados", valor: String(stats?.boletos_gerados ?? 0), sub: "total" },
-    { label: "Valor faturado", valor: fmtBRL(stats?.valor_faturado ?? 0), sub: "acumulado" },
-    {
-      label: "Em aberto",
-      valor: fmtBRL(stats?.em_aberto ?? 0),
-      sub: `${stats?.em_aberto_qtd ?? 0} boletos`,
-      destaque: true,
-    },
-  ];
+  const cards =
+    tipoFixo === "NFSE"
+      ? [
+          { label: "NFS-e emitidas", valor: String(stats?.nfse_emitidas ?? 0), sub: "total" },
+          { label: "Valor faturado", valor: fmtBRL(stats?.valor_faturado ?? 0), sub: "acumulado" },
+        ]
+      : [
+          { label: "Boletos gerados", valor: String(stats?.boletos_gerados ?? 0), sub: "total" },
+          {
+            label: "Em aberto",
+            valor: fmtBRL(stats?.em_aberto ?? 0),
+            sub: `${stats?.em_aberto_qtd ?? 0} boletos`,
+            destaque: true,
+          },
+        ];
 
   return (
     <div className="px-9 pt-[26px] pb-[60px]">
@@ -99,17 +100,6 @@ export const Historico = () => {
             onChange={(e) => setDataFim(e.target.value)}
             className="h-[42px] border-[1.5px] border-[#E2E8E6] rounded-[10px] px-3 text-[13.5px] outline-none focus:border-brand"
           />
-        </FiltroCampo>
-        <FiltroCampo label="Tipo">
-          <select
-            value={tipo}
-            onChange={(e) => setTipo(e.target.value)}
-            className="h-[42px] min-w-[150px] border-[1.5px] border-[#E2E8E6] rounded-[10px] px-3 text-[13.5px] bg-white outline-none focus:border-brand"
-          >
-            <option value="">Todos</option>
-            <option value="NFSE">NFS-e</option>
-            <option value="BOLETO">Boleto</option>
-          </select>
         </FiltroCampo>
         <FiltroCampo label="Status">
           <select
@@ -184,7 +174,9 @@ export const Historico = () => {
           <div className="px-[22px] py-10 text-center text-[#9AA8A2] text-sm">
             {temFiltro
               ? "Nenhum documento encontrado para os filtros selecionados."
-              : "Nenhum documento emitido ainda. Gere uma NFS-e ou boleto para começar."}
+              : tipoFixo === "NFSE"
+              ? "Nenhuma nota gerada ainda. Emita uma NFS-e para começar."
+              : "Nenhum boleto gerado ainda. Gere um boleto para começar."}
           </div>
         )}
       </div>
@@ -208,3 +200,6 @@ function FiltroCampo({
     </div>
   );
 }
+
+export const NotasGeradas = () => <DocumentosLista tipoFixo="NFSE" />;
+export const BoletosGerados = () => <DocumentosLista tipoFixo="BOLETO" />;
