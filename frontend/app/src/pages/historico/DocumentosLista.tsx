@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiEye, FiX } from "react-icons/fi";
+import { FiEye, FiX, FiDownload } from "react-icons/fi";
 import api from "../../api/api";
 import { Documento, Estatisticas, TipoDocumento } from "../../types";
 import { fmtBRL } from "../../utils/format";
@@ -46,6 +46,20 @@ export const DocumentosLista = ({ tipoFixo }: { tipoFixo: TipoDocumento }) => {
     setStatus("");
     setDataInicio("");
     setDataFim("");
+  }
+
+  function baixarXml(d: Documento) {
+    const xml = d.dados?.xmlAssinado;
+    if (!xml) return;
+    const blob = new Blob([xml], { type: "application/xml" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `nfse-${d.numero || d.id}.xml`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   }
 
   const cards =
@@ -160,9 +174,19 @@ export const DocumentosLista = ({ tipoFixo }: { tipoFixo: TipoDocumento }) => {
             <div>
               <StatusBadge status={d.status} />
             </div>
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              {d.tipo === "NFSE" && d.dados?.xmlAssinado && (
+                <button
+                  onClick={() => baixarXml(d)}
+                  title="Baixar XML"
+                  className="w-8 h-8 rounded-lg border border-[#E2E8E6] bg-white flex items-center justify-center hover:border-brand"
+                >
+                  <FiDownload size={15} className="text-brand-dark" />
+                </button>
+              )}
               <button
                 onClick={() => navigate(`/documento/${d.id}`)}
+                title="Visualizar"
                 className="w-8 h-8 rounded-lg border border-[#E2E8E6] bg-white flex items-center justify-center hover:border-brand"
               >
                 <FiEye size={15} className="text-brand-dark" />
