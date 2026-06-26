@@ -14,6 +14,7 @@ export const Configuracoes = () => {
   const [nfse, setNfse] = useState<ConfigNfse | null>(null);
   const [boleto, setBoleto] = useState<ConfigBoleto | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [sincronizando, setSincronizando] = useState(false);
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
@@ -35,6 +36,45 @@ export const Configuracoes = () => {
   }
   function setB<K extends keyof ConfigBoleto>(k: K, v: ConfigBoleto[K]) {
     setBoleto((c) => (c ? { ...c, [k]: v } : c));
+  }
+
+  async function sincronizarRps() {
+    const numStr = window.prompt(
+      "Número da última NFS-e emitida (consulte no portal da prefeitura):"
+    );
+    if (numStr === null) return;
+    const numeroNfse = Number(numStr.replace(/\D/g, "")) || 0;
+    if (!numeroNfse) {
+      setMsg("Informe um número de NFS-e válido para sincronizar.");
+      return;
+    }
+    const senha = window.prompt(
+      "Senha do certificado A1 (necessária para consultar a prefeitura):"
+    );
+    if (senha === null) return;
+    setSincronizando(true);
+    setMsg("");
+    try {
+      const { data } = await api.post("/documentos/sincronizar-rps", {
+        certPassword: senha,
+        numeroNfse,
+      });
+      setN("proximo_rps", data.proximo_rps);
+      if (data.maior_rps > 0) {
+        setMsg(
+          `Sincronizado: maior RPS na prefeitura = ${data.maior_rps} (${data.encontradas} NFS-e). Próximo RPS = ${data.proximo_rps}.`
+        );
+      } else {
+        setMsg(
+          `Nenhuma NFS-e encontrada na prefeitura para este prestador — defina o "Próximo número de RPS" manualmente.` +
+            (data.aviso ? ` (${data.aviso})` : "")
+        );
+      }
+    } catch (e: any) {
+      setMsg(e?.response?.data?.errors?.[0] || "Erro ao sincronizar com a prefeitura.");
+    } finally {
+      setSincronizando(false);
+    }
   }
 
   async function salvar() {
@@ -148,9 +188,55 @@ export const Configuracoes = () => {
             />
           </div>
         </div>
+        <p className="text-[12px] text-[#7A8A84] mt-3">
+          O optante do Simples Nacional é definido pelo <strong>Regime de tributação</strong> acima
+          (Simples Nacional = optante). Deve bater com o cadastro do contribuinte na prefeitura.
+        </p>
         <div className="flex flex-wrap gap-5 mt-4">
-          <Check label="Optante pelo Simples Nacional" checked={nfse.optante_simples} onChange={(v) => setN("optante_simples", v)} />
           <Check label="ISS retido na fonte" checked={nfse.iss_retido} onChange={(v) => setN("iss_retido", v)} />
+        </div>
+
+        <div className="text-[11px] font-bold tracking-[0.08em] uppercase text-[#9AA8A2] mt-5 mb-3">
+          Acesso ao webservice da prefeitura
+        </div>
+        <p className="text-[12.5px] text-[#7A8A84] -mt-1 mb-3">
+          Login do contribuinte no provedor (pode ser diferente do CNPJ). Usado para autenticar o envio da NFS-e.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-[12.5px] font-semibold text-[#5A6A63] mb-1.5">
+              Próximo número de RPS
+            </label>
+            <div className="flex gap-2">
+              <input
+                value={String(nfse.proximo_rps ?? "")}
+                onChange={(e) => setN("proximo_rps", Number(e.target.value.replace(/\D/g, "")) || 0)}
+                className="w-full h-[42px] border-[1.5px] border-[#E2E8E6] rounded-[10px] px-3 text-[13.5px] font-mono bg-white outline-none focus:border-brand"
+              />
+              <button
+                type="button"
+                onClick={sincronizarRps}
+                disabled={sincronizando}
+                title="Consulta as NFS-e emitidas na prefeitura e ajusta o próximo RPS"
+                className="h-[42px] px-3 rounded-[10px] border-[1.5px] border-[#E2E8E6] bg-white text-[12.5px] font-semibold text-[#34433D] whitespace-nowrap hover:border-brand hover:text-brand-dark disabled:opacity-60"
+              >
+                {sincronizando ? "Sincronizando…" : "Sincronizar"}
+              </button>
+            </div>
+          </div>
+          <Field label="Usuário (username)" value={nfse.ws_username} onChange={(v) => setN("ws_username", v)} mono />
+          <div>
+            <label className="block text-[12.5px] font-semibold text-[#5A6A63] mb-1.5">
+              Senha (password)
+            </label>
+            <input
+              type="password"
+              value={nfse.ws_password}
+              onChange={(e) => setN("ws_password", e.target.value)}
+              autoComplete="new-password"
+              className="w-full h-[42px] border-[1.5px] border-[#E2E8E6] rounded-[10px] px-3 text-[13.5px] font-mono bg-white outline-none focus:border-brand"
+            />
+          </div>
         </div>
       </Card>
 

@@ -90,8 +90,13 @@ function DocNfse({ doc, d, tomador }: { doc: Documento; d: any; tomador: any }) 
         </div>
       </div>
 
-      <div className="grid grid-cols-3 border-b border-[#EAEFED]">
+      <div className="grid grid-cols-2 lg:grid-cols-4 border-b border-[#EAEFED]">
         <InfoCell label="Número da NFS-e" valor={doc.numero} corValor="#0A9E84" mono />
+        <InfoCell
+          label="Número do RPS"
+          valor={d.numero_rps ? `${d.numero_rps} / série ${d.serie_rps || "1"}` : "—"}
+          mono
+        />
         <InfoCell
           label="Data e hora de emissão"
           valor={doc.criado_em ? new Date(doc.criado_em).toLocaleString("pt-BR") : "—"}

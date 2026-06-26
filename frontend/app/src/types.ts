@@ -68,6 +68,9 @@ export interface ConfigNfse {
   regime: string;
   optante_simples: boolean;
   iss_retido: boolean;
+  ws_username: string;
+  ws_password: string;
+  proximo_rps: number;
 }
 
 export interface ConfigBoleto {

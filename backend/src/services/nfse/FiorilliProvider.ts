@@ -43,24 +43,30 @@ export class FiorilliProvider {
   assinarXml(xml: string, referenceId: string, password: string): string {
     const { privateKeyPem, x509Certificate } =
       this.extrairChaveECertificado(password);
-    const keyInfoContent = `<X509Data><X509Certificate>${x509Certificate}</X509Certificate></X509Data>`;
+    // Assinatura com prefixo "ds:" e namespace EXPLÍCITO (xmlns:ds=...). O
+    // validador do Fiorilli não respeita a redeclaração de namespace default
+    // (<Signature xmlns="xmldsig"> dentro de xmlns="abrasf"): ele lê a tag como
+    // {abrasf}Signature e rejeita com L4 "Signature unexpected". O prefixo ds:
+    // resolve o namespace sem ambiguidade. Por isso o KeyInfo também é prefixado.
+    const keyInfoContent = `<ds:X509Data><ds:X509Certificate>${x509Certificate}</ds:X509Certificate></ds:X509Data>`;
+    // O webservice exige canonicalização INCLUSIVA (REC-xml-c14n-20010315),
+    // não a exclusiva (exc-c14n). Confirmado em integrações Fiorilli/ACBr.
+    const C14N = "http://www.w3.org/TR/2001/REC-xml-c14n-20010315";
     const signer = new SignedXml({
-      implicitTransforms: ["http://www.w3.org/TR/2001/REC-xml-c14n-20010315"],
+      implicitTransforms: [C14N],
       privateKey: privateKeyPem,
       publicCert: x509Certificate,
       signatureAlgorithm: "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
-      canonicalizationAlgorithm: "http://www.w3.org/2001/10/xml-exc-c14n#",
+      canonicalizationAlgorithm: C14N,
       getKeyInfoContent: () => keyInfoContent,
     });
     signer.addReference({
       xpath: `//*[local-name(.)='${referenceId}']`,
       digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
-      transforms: [
-        "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
-        "http://www.w3.org/2001/10/xml-exc-c14n#",
-      ],
+      transforms: ["http://www.w3.org/2000/09/xmldsig#enveloped-signature", C14N],
     });
     signer.computeSignature(xml, {
+      prefix: "ds",
       location: {
         reference: `//*[local-name(.)='${referenceId}']`,
         action: "after",
@@ -87,15 +93,38 @@ export class FiorilliProvider {
       rejectUnauthorized: false,
     });
 
+    // validateStatus: aceita qualquer status para NÃO descartar o corpo da
+    // resposta. Webservices SOAP costumam devolver o Fault (motivo real do erro)
+    // com HTTP 500 — sem isso, só veríamos "Request failed with status code 500".
     const response = await axios.post(this.wsdlUrl, soapXml, {
       httpsAgent,
       timeout: 600000,
+      validateStatus: () => true,
       headers: {
         "Content-Type": "text/xml; charset=UTF-8",
         SOAPAction: soapAction,
       },
     });
 
-    return response.data;
+    const data =
+      typeof response.data === "string"
+        ? response.data
+        : response.data == null
+        ? ""
+        : String(response.data);
+
+    // Erro HTTP sem corpo SOAP aproveitável: propaga com status + trecho do corpo.
+    if (
+      response.status >= 400 &&
+      !/Fault|MensagemRetorno|InfNfse|Nfse|Retorno/i.test(data)
+    ) {
+      throw new Error(
+        `Webservice retornou HTTP ${response.status}. Resposta: ${
+          data.slice(0, 800) || "(corpo vazio)"
+        }`
+      );
+    }
+
+    return data;
   }
 }

@@ -11,7 +11,7 @@ import {
   WS_CREDENCIAIS,
 } from "../../config/nfse";
 import { codigoIbge } from "../../utils/municipios";
-import { getEmpresa } from "../configuracao/EmpresaConfig";
+import { getEmpresa, getNfseConfig, setProximoRps } from "../configuracao/EmpresaConfig";
 import { NfseXmlFactory, DadosRps } from "./NfseXmlFactory";
 import { FiorilliProvider } from "./FiorilliProvider";
 
@@ -49,7 +49,9 @@ export interface DadosNfse {
 
 export interface ResultadoNfse {
   ambiente: Ambiente;
-  numero: string;
+  numero: string; // número da NFS-e (atribuído pela prefeitura quando autorizada)
+  numero_rps: string; // número do RPS (sequência controlada por nós)
+  serie_rps: string;
   codigo_verificacao: string;
   valor_iss: number;
   valor_liquido: number;
@@ -89,8 +91,6 @@ function gerarCodigoVerificacao(): string {
   return Math.random().toString(36).slice(2, 11).toUpperCase();
 }
 
-let sequencialRps = 4903;
-
 class NfseService {
   private xmlFactory = new NfseXmlFactory();
 
@@ -110,12 +110,23 @@ class NfseService {
     const aliquota = dados.aliquota ?? 5;
     const valorIss = +(dados.valor * (aliquota / 100)).toFixed(2);
 
-    const numeroRps = dados.numeroRps ?? ++sequencialRps;
     const uuidLanc = uuidv4().replace(/-/g, "").slice(0, 20);
     const t = dados.tomador;
 
     // Empresa emitente (prestador) — configurável em Configurações → Empresa.
     const empresa = await getEmpresa();
+    const nfseCfg = await getNfseConfig();
+    // Optante do Simples Nacional: determinado pelo "Regime de tributação" em
+    // Configurações → NFS-e (Simples Nacional => optante; Lucro Presumido/Real =>
+    // não optante). A emissão pode sobrepor via dados.optanteSimples. Precisa
+    // bater com o cadastro do contribuinte na prefeitura (erro L124 quando diverge).
+    const ehSimples = /simples/i.test(String(nfseCfg.regime || ""));
+    const optanteSimples =
+      dados.optanteSimples !== undefined ? !!dados.optanteSimples : ehSimples;
+    // Número do RPS: persistente (config). Pode vir explícito na emissão; senão usa
+    // o "proximo_rps" salvo. Só avança quando a NFS-e é autorizada (ver no fim),
+    // permitindo reenviar o mesmo número se a prefeitura rejeitar.
+    const numeroRps = dados.numeroRps ?? (Number(nfseCfg.proximo_rps) || 1);
     const soDig = (s: any) => String(s ?? "").replace(/\D/g, "");
     // Deriva o código IBGE do município/UF da empresa; o campo código_municipio
     // serve apenas como override quando o nome não resolver.
@@ -126,7 +137,10 @@ class NfseService {
     const prestador = {
       cnpj: soDig(empresa.cnpj) || PRESTADOR.cnpj,
       inscricaoMunicipal: empresa.inscricao_municipal || PRESTADOR.inscricaoMunicipal,
-      cnae: soDig(dados.cnae) || soDig(empresa.cnae) || PRESTADOR.cnae,
+      // CNAE: respeita o valor enviado na emissão (inclusive vazio, para OMITIR a
+      // tag — útil quando a prefeitura não exige/valida CNAE, ex. erro L115). Sem
+      // valor na emissão (ex. lote), usa o da config da empresa.
+      cnae: dados.cnae !== undefined ? soDig(dados.cnae) : soDig(empresa.cnae),
     };
     // O XML exige o código IBGE do município. Se já vier numérico, usa direto;
     // senão resolve a partir do nome da cidade + UF; senão cai no do prestador.
@@ -153,8 +167,26 @@ class NfseService {
       valorServicos: dados.valor,
       aliquota: aliquota.toFixed(4),
       issRetido: dados.issRetido ? 1 : 2,
-      responsavelRetencao: dados.issRetido ? 1 : 2,
-      itemListaServico: dados.item_lista || "14.02",
+      // 1 = Tomador. Só é enviado quando há retenção (ver NfseXmlFactory); enviar
+      // 2 (Intermediário) sem dados do intermediário dispara o erro L107.
+      responsavelRetencao: 1,
+      // O XSD da prefeitura (tsItemListaServico) aceita no máx. 6 chars no formato
+      // "GG.SS" da LC 116. Valores como "14.02.01" (código de tributação completo)
+      // são reduzidos ao item da lista ("14.02") para não estourar o maxLength.
+      itemListaServico: (dados.item_lista || "14.02")
+        .toString()
+        .split(".")
+        .slice(0, 2)
+        .join("."),
+      // Código de tributação do município (opcional): usa o da emissão; senão o
+      // da config de NFS-e. Vazio => tag omitida.
+      codigoTributacaoMunicipio: (
+        dados.cod_tributacao_municipio !== undefined
+          ? dados.cod_tributacao_municipio
+          : nfseCfg.cod_tributacao_municipio || ""
+      )
+        .toString()
+        .trim(),
       discriminacao: (dados.discriminacao || "Prestação de serviços").replace(/[<>&]/g, " "),
       codigoMunicipio: prestadorCodMun,
       exigibilidadeIss: 1,
@@ -169,8 +201,10 @@ class NfseService {
       tomadorCep: t.cep || "",
       tomadorTelefone: t.telefone || "",
       tomadorEmail: t.email || "",
-      regimeEspecial: ambiente === "producao" ? "6" : "",
-      optanteSimples: dados.optanteSimples === false ? 2 : 1,
+      // Regime Especial de Tributação: obrigatório p/ optante do Simples Nacional.
+      // 6 = ME/EPP, 5 = MEI. Quando NÃO optante, vai vazio (tag omitida).
+      regimeEspecial: optanteSimples ? "6" : "",
+      optanteSimples: optanteSimples ? 1 : 2,
       incentivoFiscal: 2,
     };
 
@@ -178,7 +212,11 @@ class NfseService {
 
     const base: ResultadoNfse = {
       ambiente,
+      // numero = NFS-e (preenchido pela prefeitura ao autorizar). Até lá, espelha
+      // o RPS. numero_rps preserva sempre o RPS, independente da autorização.
       numero: String(numeroRps),
+      numero_rps: String(numeroRps),
+      serie_rps: dados.serieRps || "1",
       codigo_verificacao: gerarCodigoVerificacao(),
       valor_iss: valorIss,
       valor_liquido: +dados.valor.toFixed(2),
@@ -201,18 +239,23 @@ class NfseService {
       return base;
     }
 
-    // Assina e envia.
+    // Envia SEM assinatura XML. Todas as posições/namespaces de <Signature>
+    // (RPS, Lote, xmldsig, abrasf, com/sem prefixo) foram recusadas com
+    // "Signature unexpected / no child element expected" — sinal de que o schema
+    // deste provedor Fiorilli NÃO possui elemento Signature (autenticação por
+    // login + certificado no TLS, equivalente ao "NaoAssinar" do ACBr).
     const provider = new FiorilliProvider(CERT_PATH, TEMP_DIR, getWsdlUrl(ambiente));
-    // Assina o elemento InfDeclaracaoPrestacaoServico (o Id "RPS..." vira o URI da referência).
-    const xmlAssinado = provider.assinarXml(rpsXml, "InfDeclaracaoPrestacaoServico", senha);
-    base.xmlAssinado = xmlAssinado;
 
-    const loteXml = this.xmlFactory.createLoteXml(`LOTE${uuidLanc}`, 1, xmlAssinado, prestador);
-    const soap = this.xmlFactory.createEnviarLoteSoap(
-      loteXml,
-      WS_CREDENCIAIS.username,
-      WS_CREDENCIAIS.password
-    );
+    const loteXml = this.xmlFactory.createLoteXml(`LOTE${uuidLanc}`, 1, rpsXml, prestador);
+    const envioXml = this.xmlFactory.createEnviarLoteEnvio(loteXml);
+    base.xmlAssinado = envioXml;
+
+    // Credenciais do webservice: prioriza o que estiver salvo em Configurações →
+    // NFS-e (login do contribuinte no provedor); cai no .env como fallback.
+    const wsUser = (nfseCfg.ws_username || "").trim() || WS_CREDENCIAIS.username;
+    const wsPass = (nfseCfg.ws_password || "").trim() || WS_CREDENCIAIS.password;
+
+    const soap = this.xmlFactory.createEnviarLoteSoap(envioXml, wsUser, wsPass);
 
     const retorno = await provider.sendSoapRequest(
       soap,
@@ -229,6 +272,9 @@ class NfseService {
     } catch {
       /* mantém retorno cru se não for XML */
     }
+
+    // Loga o retorno cru no console do backend para diagnóstico de faults/erros.
+    console.log("[NFSe] retorno do webservice:", String(retorno).slice(0, 2000));
 
     base.enviado = true;
     base.retornoWebservice = parsed;
@@ -255,21 +301,114 @@ class NfseService {
       base.autorizada = true;
       if (numeroNfse) base.numero = numeroNfse;
       if (codVerif) base.codigo_verificacao = codVerif;
+      // Avança o contador de RPS só quando autorizada (rejeições reusam o número).
+      if (dados.numeroRps === undefined) await setProximoRps(numeroRps + 1);
     } else {
       // Rejeitada ou falha: monta um aviso com as mensagens de erro.
       base.autorizada = false;
       const erros = mensagens
         .map((m) => [m.codigo, m.mensagem, m.correcao].filter(Boolean).join(" — "))
         .filter(Boolean);
+      // Sem erro estruturado: usa o fault SOAP ou um trecho cru do retorno.
+      const trechoCru =
+        typeof retorno === "string" && retorno.trim()
+          ? retorno.replace(/\s+/g, " ").trim().slice(0, 600)
+          : "";
       const detalhe = erros.length
         ? erros.join(" | ")
-        : fault || "A prefeitura não retornou a NFS-e. Verifique o retorno do webservice.";
+        : fault ||
+          trechoCru ||
+          "A prefeitura não retornou a NFS-e. Verifique o retorno do webservice.";
       base.aviso = [avisoMunicipio, `Rejeitada pela prefeitura: ${detalhe}`]
         .filter(Boolean)
         .join(" ");
     }
 
     return base;
+  }
+
+  /**
+   * Consulta as NFS-e emitidas pelo prestador na prefeitura e ajusta o
+   * "proximo_rps" para (maior RPS encontrado + 1). Usa o campo IdentificacaoRps
+   * (o RPS), não o número da NFS-e.
+   */
+  async sincronizarRps(
+    certPassword?: string,
+    numeroNfseFinal?: number
+  ): Promise<{ maior_rps: number; proximo_rps: number; encontradas: number; aviso?: string }> {
+    const empresa = await getEmpresa();
+    const nfseCfg = await getNfseConfig();
+
+    // A consulta por faixa exige um NumeroNfseFinal existente. Sem ele não há
+    // como descobrir as NFS-e (a consulta por período do provedor retorna erro).
+    if (!numeroNfseFinal || numeroNfseFinal <= 0) {
+      return {
+        maior_rps: 0,
+        proximo_rps: Number(nfseCfg.proximo_rps) || 1,
+        encontradas: 0,
+        aviso:
+          "Informe o número da última NFS-e emitida (consulte no portal da prefeitura) para buscar o RPS.",
+      };
+    }
+    const ambiente: Ambiente = nfseCfg.ambiente === "producao" ? "producao" : "homologacao";
+    const soDig = (s: any) => String(s ?? "").replace(/\D/g, "");
+    const prestador = {
+      cnpj: soDig(empresa.cnpj) || PRESTADOR.cnpj,
+      inscricaoMunicipal: empresa.inscricao_municipal || PRESTADOR.inscricaoMunicipal,
+      cnae: "",
+    };
+    const wsUser = (nfseCfg.ws_username || "").trim() || WS_CREDENCIAIS.username;
+    const wsPass = (nfseCfg.ws_password || "").trim() || WS_CREDENCIAIS.password;
+    const senha = certPassword || CERT_PASSWORD;
+
+    const provider = new FiorilliProvider(CERT_PATH, TEMP_DIR, getWsdlUrl(ambiente));
+
+    let maior = 0;
+    let encontradas = 0;
+    let avisoConsulta = "";
+
+    for (let pagina = 1; pagina <= 200; pagina++) {
+      const envio = this.xmlFactory.createConsultarFaixaEnvio(prestador, 1, numeroNfseFinal, pagina);
+      const soap = this.xmlFactory.createConsultarFaixaSoap(envio, wsUser, wsPass);
+      const retorno = await provider.sendSoapRequest(soap, "consultarNfsePorFaixa", senha);
+
+      if (pagina === 1) {
+        console.log("[NFSe] consulta por faixa - retorno:", String(retorno).slice(0, 2000));
+      }
+
+      let parsed: any = retorno;
+      try {
+        parsed = await parseStringPromise(retorno, {
+          explicitArray: false,
+          tagNameProcessors: [processors.stripPrefix],
+        });
+      } catch {
+        /* mantém cru */
+      }
+
+      const rpsNums = coletar(parsed, "IdentificacaoRps")
+        .map((r: any) => parseInt(txt(r?.Numero), 10))
+        .filter((n: number) => !isNaN(n));
+
+      if (rpsNums.length === 0) {
+        // Sem resultados: registra eventual fault/mensagem só na 1ª página.
+        if (pagina === 1) {
+          const fault = coletar(parsed, "faultstring").map(txt).filter(Boolean)[0];
+          const msg = coletar(parsed, "Mensagem").map(txt).filter(Boolean)[0];
+          avisoConsulta = fault || msg || "";
+        }
+        break;
+      }
+
+      encontradas += rpsNums.length;
+      maior = Math.max(maior, ...rpsNums);
+    }
+
+    const proximoAtual = Number(nfseCfg.proximo_rps) || 1;
+    const proximo = maior > 0 ? maior + 1 : proximoAtual;
+    if (maior > 0) await setProximoRps(proximo);
+
+    return { maior_rps: maior, proximo_rps: proximo, encontradas, aviso: avisoConsulta || undefined };
   }
 }
 

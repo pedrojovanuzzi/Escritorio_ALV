@@ -4,7 +4,7 @@ import AppDataSource from "../database/DataSource";
 import { Documento } from "../entities/Documento";
 import NfseService from "../services/nfse/NfseService";
 import BoletoService from "../services/boleto/BoletoService";
-import { getEmpresa } from "../services/configuracao/EmpresaConfig";
+import { getEmpresa, getNfseConfig } from "../services/configuracao/EmpresaConfig";
 
 class DocumentoController {
   constructor() {
@@ -14,6 +14,40 @@ class DocumentoController {
     this.gerarBoleto = this.gerarBoleto.bind(this);
     this.emitirLote = this.emitirLote.bind(this);
     this.estatisticas = this.estatisticas.bind(this);
+    this.proximoRps = this.proximoRps.bind(this);
+    this.sincronizarRps = this.sincronizarRps.bind(this);
+  }
+
+  /** Sincroniza o próximo RPS consultando as NFS-e emitidas na prefeitura. */
+  public async sincronizarRps(req: Request, res: Response) {
+    try {
+      const { certPassword, numeroNfse } = (req.body || {}) as {
+        certPassword?: string;
+        numeroNfse?: number | string;
+      };
+      const r = await NfseService.sincronizarRps(
+        certPassword,
+        Number(numeroNfse) || 0
+      );
+      res.json(r);
+    } catch (err: any) {
+      console.error("Erro ao sincronizar RPS:", err?.message || err);
+      res.status(500).json({
+        errors: ["Erro ao sincronizar RPS: " + (err?.message || "falha desconhecida")],
+      });
+    }
+  }
+
+  /** Próximo número de RPS configurado (e o último gerado = próximo - 1). */
+  public async proximoRps(_req: Request, res: Response) {
+    try {
+      const cfg = await getNfseConfig();
+      const proximo = Number(cfg.proximo_rps) || 1;
+      res.json({ proximo_rps: proximo, ultimo_rps: Math.max(0, proximo - 1) });
+    } catch (err) {
+      console.error("Erro ao obter próximo RPS:", err);
+      res.status(500).json({ errors: ["Erro ao obter próximo RPS."] });
+    }
   }
 
   /**

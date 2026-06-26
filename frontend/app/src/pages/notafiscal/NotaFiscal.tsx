@@ -19,8 +19,9 @@ export const NotaFiscal = () => {
   const [discriminacao, setDiscriminacao] = useState(
     "Serviços de passagem de cabo de rede"
   );
-  const [itemLista, setItemLista] = useState("14.02.01");
+  const [itemLista, setItemLista] = useState("14.02");
   const [cnae, setCnae] = useState("6209100");
+  const [codTributacao, setCodTributacao] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [senhaModal, setSenhaModal] = useState(false);
 
@@ -34,7 +35,9 @@ export const NotaFiscal = () => {
         if (!c) return;
         setAmbiente(c.ambiente === "producao" ? "producao" : "homologacao");
         if (c.item_lista) setItemLista(c.item_lista);
-        if (c.cnae) setCnae(c.cnae);
+        if (c.cnae !== undefined) setCnae(c.cnae);
+        if (c.cod_tributacao_municipio !== undefined)
+          setCodTributacao(c.cod_tributacao_municipio);
         if (c.aliquota) setAliquota(c.aliquota);
         if (c.discriminacao) setDiscriminacao(c.discriminacao);
       })
@@ -65,6 +68,7 @@ export const NotaFiscal = () => {
         discriminacao,
         item_lista: itemLista,
         cnae,
+        cod_tributacao_municipio: codTributacao,
         tomador,
         certPassword,
       });
@@ -135,7 +139,7 @@ export const NotaFiscal = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Field label="Item lista serviço" value={itemLista} onChange={setItemLista} mono />
             <Field label="CNAE" value={cnae} onChange={setCnae} mono />
-            <Field label="Cód. tributação município" value="0000140200001" mono />
+            <Field label="Cód. tributação município" value={codTributacao} onChange={setCodTributacao} placeholder="Opcional" mono />
             <div className="sm:col-span-3">
               <label className="block text-[12.5px] font-semibold text-[#5A6A63] mb-1.5">
                 Discriminação do serviço

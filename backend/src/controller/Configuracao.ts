@@ -6,7 +6,7 @@ import { EMPRESA_PADRAO } from "../config/nfse";
 /** Defaults usados quando ainda não há configuração salva. */
 const NFSE_PADRAO = {
   ambiente: "homologacao",
-  item_lista: "14.02.01",
+  item_lista: "14.02",
   cnae: "6209100",
   cod_tributacao_municipio: "0000140200001",
   aliquota: "5,00",
@@ -14,6 +14,12 @@ const NFSE_PADRAO = {
   regime: "Simples Nacional — ME/EPP",
   optante_simples: true,
   iss_retido: false,
+  // Credenciais do webservice (login do contribuinte no provedor da prefeitura).
+  ws_username: "",
+  ws_password: "",
+  // Próximo número de RPS a emitir (persistente). Avança a cada NFS-e autorizada.
+  // Ajuste para o último RPS real do prestador + 1 antes de emitir em produção.
+  proximo_rps: 1,
 };
 
 const BOLETO_PADRAO = {
