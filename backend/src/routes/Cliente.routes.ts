@@ -17,6 +17,9 @@ router.post(
 );
 router.post("/importar", AuthGuard, Cliente.importar);
 
+// Edição em massa (deve vir antes de "/:id" para não ser capturada por ele).
+router.put("/lote", AuthGuard, Cliente.atualizarLote);
+
 router.get("/:id", AuthGuard, Cliente.buscar);
 router.post("/", AuthGuard, Cliente.criar);
 router.put("/:id", AuthGuard, Cliente.atualizar);

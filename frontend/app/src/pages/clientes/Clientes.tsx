@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { FiPlus, FiFileText, FiEdit2, FiX, FiTrash2, FiUpload } from "react-icons/fi";
+import { FiPlus, FiFileText, FiEdit2, FiX, FiTrash2, FiUpload, FiCheck, FiLayers } from "react-icons/fi";
 import api from "../../api/api";
 import { Cliente } from "../../types";
 import { iniciais, corPorIndice } from "../../utils/format";
 import { Field, PrimaryButton } from "../../components/ui";
 import { ImportarClientesModal } from "../../components/ImportarClientesModal";
+import { EditarNfseLoteModal } from "../../components/EditarNfseLoteModal";
 
 const VAZIO: Cliente = { nome: "", doc: "", tipo: "PJ", email: "", municipio: "" };
 
@@ -13,6 +14,8 @@ export const Clientes = () => {
   const [filtro, setFiltro] = useState<"" | "PJ" | "PF">("");
   const [importar, setImportar] = useState(false);
   const [modal, setModal] = useState<Cliente | null>(null);
+  const [sel, setSel] = useState<Record<number, boolean>>({});
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   function carregar() {
     api.get("/clientes").then((r) => setClientes(r.data)).catch(() => {});
@@ -20,6 +23,20 @@ export const Clientes = () => {
   useEffect(carregar, []);
 
   const visiveis = filtro ? clientes.filter((c) => c.tipo === filtro) : clientes;
+  const selecionados = clientes.filter((c) => sel[c.id!]);
+  const todosMarcados = visiveis.length > 0 && visiveis.every((c) => sel[c.id!]);
+
+  function toggleSel(id: number) {
+    setSel((s) => ({ ...s, [id]: !s[id] }));
+  }
+  function toggleTodos() {
+    const novo = !todosMarcados;
+    setSel((s) => {
+      const r = { ...s };
+      visiveis.forEach((c) => (r[c.id!] = novo));
+      return r;
+    });
+  }
   const pj = clientes.filter((c) => c.tipo === "PJ").length;
   const pf = clientes.filter((c) => c.tipo === "PF").length;
 
@@ -70,6 +87,14 @@ export const Clientes = () => {
           <Tab label="Pessoa Física" count={pf} value="PF" />
         </div>
         <div className="flex items-center gap-2.5">
+          {selecionados.length > 0 && (
+            <button
+              onClick={() => setBulkOpen(true)}
+              className="flex items-center gap-2 h-10 px-4 rounded-[11px] border-[1.5px] border-brand bg-[#E6F7F3] text-sm font-semibold text-brand-dark hover:bg-[#d8f1ea]"
+            >
+              <FiLayers size={16} /> Editar NFS-e dos selecionados ({selecionados.length})
+            </button>
+          )}
           <button
             onClick={() => setImportar(true)}
             className="flex items-center gap-2 h-10 px-4 rounded-[11px] border-[1.5px] border-[#E2E8E6] bg-white text-sm font-semibold text-[#34433D] hover:border-brand hover:text-brand-dark"
@@ -83,18 +108,40 @@ export const Clientes = () => {
       </div>
 
       <div className="bg-white border border-[#E7ECEA] rounded-2xl overflow-hidden">
-        <div className="grid grid-cols-[2.4fr_1.4fr_0.7fr_1.4fr_1fr] px-[22px] py-3.5 border-b border-[#EEF2F0] text-[11.5px] font-bold tracking-[0.06em] uppercase text-[#9AA8A2]">
+        <div className="grid grid-cols-[40px_2.4fr_1.4fr_0.7fr_1.4fr_1fr] px-[22px] py-3.5 border-b border-[#EEF2F0] text-[11.5px] font-bold tracking-[0.06em] uppercase text-[#9AA8A2] items-center">
+          <div
+            onClick={toggleTodos}
+            className="w-5 h-5 rounded-md border-2 cursor-pointer flex items-center justify-center"
+            style={{
+              borderColor: todosMarcados ? "#0FB99A" : "#CBD5D1",
+              background: todosMarcados ? "#0FB99A" : "#fff",
+            }}
+          >
+            {todosMarcados && <FiCheck size={12} className="text-white" strokeWidth={3.5} />}
+          </div>
           <div>Cliente</div>
           <div>CPF / CNPJ</div>
           <div>Tipo</div>
           <div>Cidade</div>
           <div className="text-right">Ações</div>
         </div>
-        {visiveis.map((c, i) => (
+        {visiveis.map((c, i) => {
+          const marcado = !!sel[c.id!];
+          return (
           <div
             key={c.id}
-            className="grid grid-cols-[2.4fr_1.4fr_0.7fr_1.4fr_1fr] px-[22px] py-[15px] border-b border-[#F2F5F4] items-center hover:bg-[#F8FBFA]"
+            className="grid grid-cols-[40px_2.4fr_1.4fr_0.7fr_1.4fr_1fr] px-[22px] py-[15px] border-b border-[#F2F5F4] items-center hover:bg-[#F8FBFA]"
           >
+            <div
+              onClick={() => toggleSel(c.id!)}
+              className="w-5 h-5 rounded-md border-2 cursor-pointer flex items-center justify-center"
+              style={{
+                borderColor: marcado ? "#0FB99A" : "#CBD5D1",
+                background: marcado ? "#0FB99A" : "#fff",
+              }}
+            >
+              {marcado && <FiCheck size={12} className="text-white" strokeWidth={3.5} />}
+            </div>
             <div className="flex items-center gap-3 min-w-0">
               <div
                 className="w-[38px] h-[38px] rounded-[10px] text-white flex items-center justify-center font-sora font-bold text-[13px] flex-none"
@@ -129,7 +176,8 @@ export const Clientes = () => {
               </button>
             </div>
           </div>
-        ))}
+          );
+        })}
         {visiveis.length === 0 && (
           <div className="px-[22px] py-10 text-center text-[#9AA8A2] text-sm">
             <FiFileText className="inline mb-2" size={22} />
@@ -206,6 +254,41 @@ export const Clientes = () => {
                   <Field label="Responsável legal" value={modal.responsavel_legal || ""} onChange={(v) => setM("responsavel_legal", v)} />
                 </div>
               </Secao>
+
+              {/* Serviço / NFS-e padrão — pré-preenche a emissão da NFS-e deste cliente */}
+              <Secao titulo="Serviço / NFS-e padrão">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <Field label="Item lista serviço" value={modal.item_lista || ""} onChange={(v) => setM("item_lista", v)} mono />
+                  <Field label="Alíquota ISS (%)" value={modal.aliquota || ""} onChange={(v) => setM("aliquota", v)} mono />
+                  <div>
+                    <label className="block text-[12.5px] font-semibold text-[#5A6A63] mb-1.5">
+                      Regime de tributação
+                    </label>
+                    <select
+                      value={modal.regime || ""}
+                      onChange={(e) => setM("regime", e.target.value)}
+                      className="w-full h-[42px] border-[1.5px] border-[#E2E8E6] rounded-[10px] px-3 text-[13.5px] bg-white outline-none focus:border-brand"
+                    >
+                      <option value="">—</option>
+                      <option>Simples Nacional — ME/EPP</option>
+                      <option>Lucro Presumido</option>
+                      <option>Lucro Real</option>
+                    </select>
+                  </div>
+                  <Field className="sm:col-span-3" label="Cód. tributação município" value={modal.cod_tributacao_municipio || ""} onChange={(v) => setM("cod_tributacao_municipio", v)} mono />
+                  <div className="sm:col-span-3">
+                    <label className="block text-[12.5px] font-semibold text-[#5A6A63] mb-1.5">
+                      Discriminação padrão do serviço
+                    </label>
+                    <textarea
+                      value={modal.discriminacao || ""}
+                      onChange={(e) => setM("discriminacao", e.target.value)}
+                      placeholder="Texto sugerido para a discriminação do serviço"
+                      className="w-full h-[70px] border-[1.5px] border-[#E2E8E6] rounded-[10px] p-3 text-[13.5px] resize-y outline-none focus:border-brand leading-relaxed"
+                    />
+                  </div>
+                </div>
+              </Secao>
             </div>
 
             <div className="flex justify-end gap-3 p-6 pt-4 border-t border-[#EEF2F0]">
@@ -228,6 +311,18 @@ export const Clientes = () => {
         onFechar={() => setImportar(false)}
         onImportado={carregar}
       />
+
+      {bulkOpen && (
+        <EditarNfseLoteModal
+          clientes={selecionados}
+          onFechar={() => setBulkOpen(false)}
+          onSalvo={() => {
+            setBulkOpen(false);
+            setSel({});
+            carregar();
+          }}
+        />
+      )}
     </div>
   );
 };

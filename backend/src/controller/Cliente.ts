@@ -12,6 +12,50 @@ class ClienteController {
     this.remover = this.remover.bind(this);
     this.importarPreview = this.importarPreview.bind(this);
     this.importar = this.importar.bind(this);
+    this.atualizarLote = this.atualizarLote.bind(this);
+  }
+
+  /**
+   * Atualiza vários clientes de uma vez com os mesmos dados (edição em massa).
+   * Só aplica os campos enviados e não vazios — campos em branco preservam o
+   * valor já existente de cada cliente.
+   */
+  public async atualizarLote(req: Request, res: Response) {
+    try {
+      const repo = AppDataSource.getRepository(Cliente);
+      const { ids, patch } = req.body as { ids: number[]; patch: Record<string, any> };
+
+      if (!Array.isArray(ids) || ids.length === 0) {
+        res.status(400).json({ errors: ["Selecione ao menos um cliente."] });
+        return;
+      }
+
+      // Campos liberados para edição em massa (dados de serviço/NFS-e).
+      const PERMITIDOS = [
+        "item_lista",
+        "cnae",
+        "aliquota",
+        "regime",
+        "cod_tributacao_municipio",
+        "discriminacao",
+      ];
+      const limpo: Record<string, any> = {};
+      for (const campo of PERMITIDOS) {
+        const v = patch?.[campo];
+        if (v !== undefined && String(v).trim() !== "") limpo[campo] = v;
+      }
+
+      if (Object.keys(limpo).length === 0) {
+        res.status(400).json({ errors: ["Informe ao menos um campo para aplicar."] });
+        return;
+      }
+
+      await repo.update(ids, limpo);
+      res.json({ atualizados: ids.length, campos: Object.keys(limpo) });
+    } catch (err) {
+      console.error("Erro ao atualizar clientes em lote:", err);
+      res.status(500).json({ errors: ["Erro ao atualizar clientes em lote."] });
+    }
   }
 
   /** Lê um TXT, e compara com o cadastro existente marcando Novo/Alterado/Igual. */

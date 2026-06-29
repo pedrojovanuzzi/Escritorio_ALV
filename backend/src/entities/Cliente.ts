@@ -45,6 +45,22 @@ export class Cliente {
   @Column({ type: "varchar", length: 20, nullable: true })
   cnae?: string;
 
+  // Padrões de serviço/NFS-e por cliente (pré-preenchem a emissão da NFS-e).
+  @Column({ type: "varchar", length: 20, nullable: true })
+  item_lista?: string;
+
+  @Column({ type: "varchar", length: 10, nullable: true })
+  aliquota?: string;
+
+  @Column({ type: "varchar", length: 60, nullable: true })
+  regime?: string;
+
+  @Column({ type: "varchar", length: 30, nullable: true })
+  cod_tributacao_municipio?: string;
+
+  @Column({ type: "text", nullable: true })
+  discriminacao?: string;
+
   @Column({ type: "varchar", length: 180, nullable: true })
   contador?: string;
 

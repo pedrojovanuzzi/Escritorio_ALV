@@ -14,7 +14,6 @@ export const Configuracoes = () => {
   const [nfse, setNfse] = useState<ConfigNfse | null>(null);
   const [boleto, setBoleto] = useState<ConfigBoleto | null>(null);
   const [salvando, setSalvando] = useState(false);
-  const [sincronizando, setSincronizando] = useState(false);
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
@@ -36,45 +35,6 @@ export const Configuracoes = () => {
   }
   function setB<K extends keyof ConfigBoleto>(k: K, v: ConfigBoleto[K]) {
     setBoleto((c) => (c ? { ...c, [k]: v } : c));
-  }
-
-  async function sincronizarRps() {
-    const numStr = window.prompt(
-      "Número da última NFS-e emitida (consulte no portal da prefeitura):"
-    );
-    if (numStr === null) return;
-    const numeroNfse = Number(numStr.replace(/\D/g, "")) || 0;
-    if (!numeroNfse) {
-      setMsg("Informe um número de NFS-e válido para sincronizar.");
-      return;
-    }
-    const senha = window.prompt(
-      "Senha do certificado A1 (necessária para consultar a prefeitura):"
-    );
-    if (senha === null) return;
-    setSincronizando(true);
-    setMsg("");
-    try {
-      const { data } = await api.post("/documentos/sincronizar-rps", {
-        certPassword: senha,
-        numeroNfse,
-      });
-      setN("proximo_rps", data.proximo_rps);
-      if (data.maior_rps > 0) {
-        setMsg(
-          `Sincronizado: maior RPS na prefeitura = ${data.maior_rps} (${data.encontradas} NFS-e). Próximo RPS = ${data.proximo_rps}.`
-        );
-      } else {
-        setMsg(
-          `Nenhuma NFS-e encontrada na prefeitura para este prestador — defina o "Próximo número de RPS" manualmente.` +
-            (data.aviso ? ` (${data.aviso})` : "")
-        );
-      }
-    } catch (e: any) {
-      setMsg(e?.response?.data?.errors?.[0] || "Erro ao sincronizar com a prefeitura.");
-    } finally {
-      setSincronizando(false);
-    }
   }
 
   async function salvar() {
@@ -158,39 +118,11 @@ export const Configuracoes = () => {
               <option value="producao">Produção</option>
             </select>
           </div>
-          <Field label="Item lista serviço" value={nfse.item_lista} onChange={(v) => setN("item_lista", v)} mono />
-          <Field label="CNAE" value={nfse.cnae} onChange={(v) => setN("cnae", v)} mono />
-          <Field label="Cód. tributação município" value={nfse.cod_tributacao_municipio} onChange={(v) => setN("cod_tributacao_municipio", v)} mono />
-          <Field label="Alíquota ISS (%)" value={nfse.aliquota} onChange={(v) => setN("aliquota", v)} mono />
-          <div>
-            <label className="block text-[12.5px] font-semibold text-[#5A6A63] mb-1.5">
-              Regime de tributação
-            </label>
-            <select
-              value={nfse.regime}
-              onChange={(e) => setN("regime", e.target.value)}
-              className="w-full h-[42px] border-[1.5px] border-[#E2E8E6] rounded-[10px] px-3 text-[13.5px] bg-white outline-none focus:border-brand"
-            >
-              <option>Simples Nacional — ME/EPP</option>
-              <option>Lucro Presumido</option>
-              <option>Lucro Real</option>
-            </select>
-          </div>
-          <div className="sm:col-span-3">
-            <label className="block text-[12.5px] font-semibold text-[#5A6A63] mb-1.5">
-              Discriminação padrão do serviço
-            </label>
-            <textarea
-              value={nfse.discriminacao}
-              onChange={(e) => setN("discriminacao", e.target.value)}
-              placeholder="Texto sugerido para a discriminação do serviço"
-              className="w-full h-[70px] border-[1.5px] border-[#E2E8E6] rounded-[10px] p-3 text-[13.5px] resize-y outline-none focus:border-brand leading-relaxed"
-            />
-          </div>
         </div>
         <p className="text-[12px] text-[#7A8A84] mt-3">
-          O optante do Simples Nacional é definido pelo <strong>Regime de tributação</strong> acima
-          (Simples Nacional = optante). Deve bater com o cadastro do contribuinte na prefeitura.
+          Item da lista de serviço, CNAE, alíquota, regime de tributação, código de tributação do
+          município e discriminação são definidos por <strong>cliente</strong> (no cadastro do
+          cliente) e usados para pré-preencher cada emissão.
         </p>
         <div className="flex flex-wrap gap-5 mt-4">
           <Check label="ISS retido na fonte" checked={nfse.iss_retido} onChange={(v) => setN("iss_retido", v)} />
@@ -207,22 +139,11 @@ export const Configuracoes = () => {
             <label className="block text-[12.5px] font-semibold text-[#5A6A63] mb-1.5">
               Próximo número de RPS
             </label>
-            <div className="flex gap-2">
-              <input
-                value={String(nfse.proximo_rps ?? "")}
-                onChange={(e) => setN("proximo_rps", Number(e.target.value.replace(/\D/g, "")) || 0)}
-                className="w-full h-[42px] border-[1.5px] border-[#E2E8E6] rounded-[10px] px-3 text-[13.5px] font-mono bg-white outline-none focus:border-brand"
-              />
-              <button
-                type="button"
-                onClick={sincronizarRps}
-                disabled={sincronizando}
-                title="Consulta as NFS-e emitidas na prefeitura e ajusta o próximo RPS"
-                className="h-[42px] px-3 rounded-[10px] border-[1.5px] border-[#E2E8E6] bg-white text-[12.5px] font-semibold text-[#34433D] whitespace-nowrap hover:border-brand hover:text-brand-dark disabled:opacity-60"
-              >
-                {sincronizando ? "Sincronizando…" : "Sincronizar"}
-              </button>
-            </div>
+            <input
+              value={String(nfse.proximo_rps ?? "")}
+              onChange={(e) => setN("proximo_rps", Number(e.target.value.replace(/\D/g, "")) || 0)}
+              className="w-full h-[42px] border-[1.5px] border-[#E2E8E6] rounded-[10px] px-3 text-[13.5px] font-mono bg-white outline-none focus:border-brand"
+            />
           </div>
           <Field label="Usuário (username)" value={nfse.ws_username} onChange={(v) => setN("ws_username", v)} mono />
           <div>

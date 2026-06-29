@@ -6,6 +6,8 @@ import { Cliente } from "../../types";
 import { Card, StepHeader, Field, PrimaryButton, ResumoBox } from "../../components/ui";
 import { AmbienteCertificado, Ambiente } from "../../components/AmbienteCertificado";
 import { SenhaCertificadoModal } from "../../components/SenhaCertificadoModal";
+import { CompletarNfseModal } from "../../components/CompletarNfseModal";
+import { camposNfseFaltantes } from "../../utils/nfse";
 import { fmtBRL, parseValor } from "../../utils/format";
 
 export const NotaFiscal = () => {
@@ -24,28 +26,41 @@ export const NotaFiscal = () => {
   const [codTributacao, setCodTributacao] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [senhaModal, setSenhaModal] = useState(false);
+  const [completarCliente, setCompletarCliente] = useState<Cliente | null>(null);
 
   useEffect(() => {
-    api.get("/clientes").then((r) => setClientes(r.data)).catch(() => {});
-    // Carrega os padrões definidos em Configurações.
+    api
+      .get("/clientes")
+      .then((r) => {
+        setClientes(r.data);
+        if (r.data?.[0]) aplicarPadroesCliente(r.data[0]);
+      })
+      .catch(() => {});
+    // Ambiente padrão continua vindo de Configurações.
     api
       .get("/configuracoes")
       .then((r) => {
         const c = r.data?.nfse;
         if (!c) return;
         setAmbiente(c.ambiente === "producao" ? "producao" : "homologacao");
-        if (c.item_lista) setItemLista(c.item_lista);
-        if (c.cnae !== undefined) setCnae(c.cnae);
-        if (c.cod_tributacao_municipio !== undefined)
-          setCodTributacao(c.cod_tributacao_municipio);
-        if (c.aliquota) setAliquota(c.aliquota);
-        if (c.discriminacao) setDiscriminacao(c.discriminacao);
       })
       .catch(() => {});
   }, []);
 
+  // Pré-preenche os campos de serviço/tributação a partir do cliente selecionado.
+  // Mantém o valor atual quando o cliente não tem o padrão cadastrado.
+  function aplicarPadroesCliente(c?: Cliente) {
+    if (!c) return;
+    if (c.item_lista) setItemLista(c.item_lista);
+    if (c.cnae) setCnae(c.cnae);
+    if (c.cod_tributacao_municipio) setCodTributacao(c.cod_tributacao_municipio);
+    if (c.aliquota) setAliquota(c.aliquota);
+    if (c.discriminacao) setDiscriminacao(c.discriminacao);
+  }
+
   const cliente = clientes[idx];
   const tomador = { ...cliente, ...edits } as Cliente;
+  const optanteSimples = /simples/i.test(String(cliente?.regime || ""));
 
   const valorNum = parseValor(valor);
   const aliqNum = parseValor(aliquota);
@@ -53,6 +68,24 @@ export const NotaFiscal = () => {
 
   function setT(campo: keyof Cliente, v: string) {
     setEdits((e) => ({ ...e, [campo]: v }));
+  }
+
+  // Antes de emitir, exige que o cliente tenha os dados de NFS-e no cadastro.
+  function iniciarEmissao() {
+    if (!cliente) return;
+    if (camposNfseFaltantes(cliente).length) {
+      setCompletarCliente(cliente);
+      return;
+    }
+    setSenhaModal(true);
+  }
+
+  // Após completar o cadastro no popup, atualiza o cliente e segue p/ a emissão.
+  function aoCompletarCliente(c: Cliente) {
+    setClientes((arr) => arr.map((x) => (x.id === c.id ? c : x)));
+    aplicarPadroesCliente(c);
+    setCompletarCliente(null);
+    setSenhaModal(true);
   }
 
   async function emitir(certPassword: string) {
@@ -69,6 +102,7 @@ export const NotaFiscal = () => {
         item_lista: itemLista,
         cnae,
         cod_tributacao_municipio: codTributacao,
+        optanteSimples,
         tomador,
         certPassword,
       });
@@ -104,8 +138,10 @@ export const NotaFiscal = () => {
             <select
               value={idx}
               onChange={(e) => {
-                setIdx(+e.target.value);
+                const i = +e.target.value;
+                setIdx(i);
                 setEdits({});
+                aplicarPadroesCliente(clientes[i]);
               }}
               className="w-full h-11 border-[1.5px] border-[#BFE6DB] rounded-[9px] px-3 text-sm font-semibold bg-white outline-none focus:border-brand cursor-pointer"
             >
@@ -133,41 +169,27 @@ export const NotaFiscal = () => {
           </div>
         </Card>
 
-        {/* 2 - Descrição */}
+        {/* 2 - Valores */}
         <Card>
-          <StepHeader n={2} title="Descrição do serviço" />
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Field label="Item lista serviço" value={itemLista} onChange={setItemLista} mono />
-            <Field label="CNAE" value={cnae} onChange={setCnae} mono />
-            <Field label="Cód. tributação município" value={codTributacao} onChange={setCodTributacao} placeholder="Opcional" mono />
-            <div className="sm:col-span-3">
-              <label className="block text-[12.5px] font-semibold text-[#5A6A63] mb-1.5">
-                Discriminação do serviço
-              </label>
-              <textarea
-                value={discriminacao}
-                onChange={(e) => setDiscriminacao(e.target.value)}
-                className="w-full h-[78px] border-[1.5px] border-[#E2E8E6] rounded-[10px] p-3 text-[13.5px] resize-y outline-none focus:border-brand leading-relaxed"
-              />
-            </div>
-          </div>
-        </Card>
-
-        {/* 3 - Valores */}
-        <Card>
-          <StepHeader n={3} title="Valores e tributos" />
+          <StepHeader n={2} title="Valores e tributos" />
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <Field label="Valor do serviço" value={valor} onChange={setValor} mono />
             <Field label="Deduções" value="0,00" mono />
             <Field label="Alíquota ISS (%)" value={aliquota} onChange={setAliquota} mono />
             <Field label="Valor ISS" value={fmtBRL(iss)} mono />
           </div>
-          <label className="flex items-center gap-2.5 mt-4 text-[13.5px] text-[#34433D]">
-            <span className="w-[18px] h-[18px] rounded-md bg-brand inline-flex items-center justify-center text-white flex-none">
-              <FiCheckCircle size={12} />
+          <div className="flex items-center gap-2.5 mt-4 text-[13.5px] text-[#34433D]">
+            <span
+              className="w-[18px] h-[18px] rounded-md inline-flex items-center justify-center text-white flex-none"
+              style={{ background: optanteSimples ? "#0FB99A" : "#CBD5D1" }}
+            >
+              {optanteSimples && <FiCheckCircle size={12} />}
             </span>
-            Optante pelo Simples Nacional
-          </label>
+            {optanteSimples
+              ? "Optante pelo Simples Nacional"
+              : "Não optante pelo Simples Nacional"}
+            <span className="text-[12px] text-[#9AA8A2]">(definido pelo regime do cliente)</span>
+          </div>
         </Card>
       </div>
 
@@ -184,7 +206,7 @@ export const NotaFiscal = () => {
           totalValor={fmtBRL(valorNum)}
         />
         <PrimaryButton
-          onClick={() => setSenhaModal(true)}
+          onClick={iniciarEmissao}
           disabled={enviando || !cliente}
           className="w-full"
         >
@@ -204,6 +226,12 @@ export const NotaFiscal = () => {
         enviando={enviando}
         onCancelar={() => setSenhaModal(false)}
         onConfirmar={(senha) => emitir(senha)}
+      />
+
+      <CompletarNfseModal
+        cliente={completarCliente}
+        onFechar={() => setCompletarCliente(null)}
+        onSalvo={aoCompletarCliente}
       />
     </div>
   );

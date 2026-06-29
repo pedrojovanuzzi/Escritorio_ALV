@@ -29,6 +29,12 @@ export interface Cliente {
   inscricao_municipal?: string;
   inscricao_estadual?: string;
   cnae?: string;
+  // Padrões de serviço/NFS-e por cliente (pré-preenchem a emissão da NFS-e).
+  item_lista?: string;
+  aliquota?: string;
+  regime?: string;
+  cod_tributacao_municipio?: string;
+  discriminacao?: string;
   contador?: string;
   responsavel_legal?: string;
   natureza_juridica?: string;
@@ -60,12 +66,6 @@ export interface Documento {
 
 export interface ConfigNfse {
   ambiente: "homologacao" | "producao";
-  item_lista: string;
-  cnae: string;
-  cod_tributacao_municipio: string;
-  aliquota: string;
-  discriminacao: string;
-  regime: string;
   optante_simples: boolean;
   iss_retido: boolean;
   ws_username: string;

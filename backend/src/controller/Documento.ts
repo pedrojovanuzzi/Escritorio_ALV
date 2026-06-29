@@ -1,7 +1,8 @@
 import { Request, Response } from "express";
-import { Between, MoreThanOrEqual, LessThanOrEqual } from "typeorm";
+import { Between, MoreThanOrEqual, LessThanOrEqual, In } from "typeorm";
 import AppDataSource from "../database/DataSource";
 import { Documento } from "../entities/Documento";
+import { Cliente } from "../entities/Cliente";
 import NfseService from "../services/nfse/NfseService";
 import BoletoService from "../services/boleto/BoletoService";
 import { getEmpresa, getNfseConfig } from "../services/configuracao/EmpresaConfig";
@@ -183,6 +184,42 @@ class DocumentoController {
         return;
       }
 
+      // Para NFS-e, carrega os clientes envolvidos para montar tomador + dados
+      // fiscais (item da lista, CNAE, alíquota, regime, discriminação) do cadastro.
+      let clientesPorId = new Map<number, Cliente>();
+      if (tipo === "NFSE") {
+        const ids = itens.map((i) => Number(i.cliente_id)).filter(Boolean);
+        if (ids.length) {
+          const cs = await AppDataSource.getRepository(Cliente).find({
+            where: { id: In(ids) },
+          });
+          clientesPorId = new Map(cs.map((c) => [c.id!, c]));
+        }
+
+        // Bloqueia o lote inteiro se algum cliente não tiver os dados de NFS-e.
+        const incompletos: Array<{ cliente_id: number; nome: string; faltando: string[] }> = [];
+        for (const item of itens) {
+          const c = clientesPorId.get(Number(item.cliente_id));
+          const faltando = camposNfseFaltantes(c);
+          if (faltando.length) {
+            incompletos.push({
+              cliente_id: Number(item.cliente_id),
+              nome: c?.nome || item.cliente_nome || "—",
+              faltando,
+            });
+          }
+        }
+        if (incompletos.length) {
+          res.status(422).json({
+            errors: [
+              "Há clientes sem os dados de NFS-e no cadastro. Complete-os antes de emitir.",
+            ],
+            incompletos,
+          });
+          return;
+        }
+      }
+
       const gerados: Documento[] = [];
       let comErro = 0;
 
@@ -203,7 +240,9 @@ class DocumentoController {
               })
             );
           } else {
-            const r = await NfseService.emitir(item);
+            const c = clientesPorId.get(Number(item.cliente_id));
+            const dadosNfse = montarNfseDeCliente(c, item);
+            const r = await NfseService.emitir(dadosNfse);
             gerados.push(
               repo.create({
                 tipo: "NFSE",
@@ -261,6 +300,61 @@ class DocumentoController {
       res.status(500).json({ errors: ["Erro ao calcular estatísticas."] });
     }
   }
+}
+
+/* ----------------------- helpers de NFS-e por cliente ---------------------- */
+
+// Campos do cadastro do cliente obrigatórios para emitir NFS-e.
+const CAMPOS_NFSE: Array<{ campo: keyof Cliente; label: string }> = [
+  { campo: "item_lista", label: "Item lista serviço" },
+  { campo: "cnae", label: "CNAE" },
+  { campo: "aliquota", label: "Alíquota ISS (%)" },
+  { campo: "regime", label: "Regime de tributação" },
+  { campo: "discriminacao", label: "Discriminação do serviço" },
+];
+
+/** Rótulos dos campos de NFS-e ainda não preenchidos no cadastro do cliente. */
+function camposNfseFaltantes(c?: Cliente | null): string[] {
+  if (!c) return CAMPOS_NFSE.map((f) => f.label);
+  return CAMPOS_NFSE.filter(
+    (f) => !String((c as any)[f.campo] ?? "").trim()
+  ).map((f) => f.label);
+}
+
+/** Converte alíquota "5,00" / "5.00" em número (%). */
+function parseAliquota(a?: string): number {
+  const n = parseFloat(String(a ?? "").replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Monta os dados de emissão da NFS-e a partir do cadastro do cliente. */
+function montarNfseDeCliente(c: Cliente | undefined, item: any) {
+  const optanteSimples = /simples/i.test(String(c?.regime || ""));
+  return {
+    ...item,
+    valor: Number(item.valor) || 0,
+    item_lista: c?.item_lista,
+    cnae: c?.cnae,
+    aliquota: parseAliquota(c?.aliquota),
+    cod_tributacao_municipio: c?.cod_tributacao_municipio || "",
+    discriminacao: c?.discriminacao,
+    optanteSimples,
+    // Tomador montado a partir do cadastro do cliente.
+    tomador: {
+      doc: c?.doc || "",
+      nome: c?.nome || item.cliente_nome || "",
+      inscricao_municipal: c?.inscricao_municipal || "",
+      endereco: c?.endereco || "",
+      numero: c?.numero || "",
+      complemento: c?.complemento || "",
+      bairro: c?.bairro || "",
+      municipio: c?.municipio || "",
+      uf: c?.uf || "",
+      cep: c?.cep || "",
+      telefone: c?.telefone || "",
+      email: c?.email || "",
+    },
+  };
 }
 
 export default new DocumentoController();
